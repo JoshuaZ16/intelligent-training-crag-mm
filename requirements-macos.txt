@@ -1,0 +1,14 @@
+# Apple Silicon development and week-2 local evaluation.
+# Python 3.11 is the verified interpreter.
+datasets==3.6.0
+cragmm-search-pipeline==0.5.1
+mlx-vlm==0.6.4
+torch==2.13.0
+torchvision==0.28.0
+transformers==5.12.1
+pandas==3.0.3
+rich==15.0.0
+python-dotenv==1.2.2
+openai==2.45.0
+tokenizers==0.22.2
+loguru==0.7.3

@@ -1,0 +1,29 @@
+# Python environments and bytecode
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.so
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Downloaded models and datasets (retrieve these from Hugging Face instead)
+local_models/
+local_data/
+
+# Generated evaluation, rendering, and temporary outputs
+artifacts/
+*.inspect.ndjson
+
+# Tool and operating-system metadata
+.DS_Store
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
