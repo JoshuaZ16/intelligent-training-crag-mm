@@ -13,6 +13,12 @@ import itertools
 import pandas as pd
 from typing import Dict, Any
 
+from agents.download_compat import (
+    DEFAULT_IMAGE_USER_AGENT,
+    request_with_retries,
+    wikimedia_thumbnail_url,
+)
+
 def ensure_crag_cache_dir_is_configured():
     """
     Ensure the cache directory for CRAG images exists and is properly configured.
@@ -93,8 +99,24 @@ def download_image_url(image_url):
                 # Continue with download as the cached file is invalid
         
         # Download the image
-        headers = {"User-Agent": "CRAGBot/v0.0.1"}
-        response = requests.get(image_url, stream=True, timeout=10, headers=headers)
+        headers = {
+            "User-Agent": os.getenv("CRAG_IMAGE_USER_AGENT", DEFAULT_IMAGE_USER_AGENT)
+        }
+        attempts = int(os.getenv("CRAG_IMAGE_DOWNLOAD_ATTEMPTS", "4"))
+        timeout = int(os.getenv("CRAG_IMAGE_DOWNLOAD_TIMEOUT", "30"))
+        thumbnail_width = int(os.getenv("CRAG_WIKIMEDIA_THUMBNAIL_WIDTH", "1280"))
+        request_url = (
+            wikimedia_thumbnail_url(image_url, width=thumbnail_width) or image_url
+        )
+        if request_url != image_url:
+            print(f"Using Wikimedia {thumbnail_width}px thumbnail for {image_url}")
+        response = request_with_retries(
+            requests.get,
+            request_url,
+            attempts=attempts,
+            timeout=timeout,
+            headers=headers,
+        )
         response.raise_for_status()
         
         # Save the image to a temporary file first

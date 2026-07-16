@@ -1,0 +1,3 @@
+pair_dir,runner_pair_valid,strict_acceptance,reason
+round_3,True,False,vLLM tokenizer decode prefixed forced refusals with <|begin_of_text|>.
+round_3b,True,False,Generic refusal normalization overwrote conflicting_evidence with insufficient_evidence.

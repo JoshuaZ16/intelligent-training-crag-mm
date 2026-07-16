@@ -1,0 +1,5 @@
+scope,version,b_baseline_correct_variant_wrong,c_baseline_wrong_variant_correct,discordant,p_value
+primary_20,a1,0,0,0,1.0
+primary_20,a2,0,0,0,1.0
+primary_20,a3,1,0,1,1.0
+primary_20,full,1,0,1,1.0

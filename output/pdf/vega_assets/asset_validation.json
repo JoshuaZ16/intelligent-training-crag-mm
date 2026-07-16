@@ -1,0 +1,68 @@
+{
+  "thresholds_sha256": "fcb0fe488c33af1bc14ced9dacb4044714ea450b5640f1cfa1b964dd3e45cdbc",
+  "accepted_runs": [
+    {
+      "run_key": "b0_r1",
+      "valid": true,
+      "trace_count": 30,
+      "result_count": 30
+    },
+    {
+      "run_key": "a1",
+      "valid": true,
+      "trace_count": 30,
+      "result_count": 30
+    },
+    {
+      "run_key": "b0_r2",
+      "valid": true,
+      "trace_count": 30,
+      "result_count": 30
+    },
+    {
+      "run_key": "a2",
+      "valid": true,
+      "trace_count": 30,
+      "result_count": 30
+    },
+    {
+      "run_key": "b0_r3",
+      "valid": true,
+      "trace_count": 30,
+      "result_count": 30
+    },
+    {
+      "run_key": "a3",
+      "valid": true,
+      "trace_count": 30,
+      "result_count": 30
+    },
+    {
+      "run_key": "b0_r4",
+      "valid": true,
+      "trace_count": 30,
+      "result_count": 30
+    },
+    {
+      "run_key": "full",
+      "valid": true,
+      "trace_count": 30,
+      "result_count": 30
+    }
+  ],
+  "excluded_runs": [
+    {
+      "pair_dir": "round_3",
+      "runner_pair_valid": true,
+      "strict_acceptance": false,
+      "reason": "vLLM tokenizer decode prefixed forced refusals with <|begin_of_text|>."
+    },
+    {
+      "pair_dir": "round_3b",
+      "runner_pair_valid": true,
+      "strict_acceptance": false,
+      "reason": "Generic refusal normalization overwrote conflicting_evidence with insufficient_evidence."
+    }
+  ],
+  "system_metric_rows": 8
+}

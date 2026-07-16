@@ -1,0 +1,363 @@
+\documentclass[11pt,a4paper,fontset=none]{ctexart}
+\usepackage[a4paper,margin=1.75cm,headheight=15pt]{geometry}
+\usepackage{fontspec}
+\setmainfont{Helvetica Neue}
+\setsansfont{Helvetica Neue}
+\setmonofont{Menlo}
+\setCJKmainfont[BoldFont=Noto Sans CJK SC Bold]{Noto Sans CJK SC}
+\setCJKsansfont[BoldFont=Noto Sans CJK SC Bold]{Noto Sans CJK SC}
+\setCJKmonofont{Noto Sans CJK SC}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{xcolor}
+\definecolor{navy}{HTML}{102A43}
+\definecolor{blue}{HTML}{1677FF}
+\definecolor{cyan}{HTML}{13C2C2}
+\definecolor{green}{HTML}{16A085}
+\definecolor{orange}{HTML}{FA8C16}
+\definecolor{red}{HTML}{D4380D}
+\definecolor{ink}{HTML}{243B53}
+\definecolor{muted}{HTML}{627D98}
+\definecolor{line}{HTML}{D9E2EC}
+\definecolor{panel}{HTML}{F4F7FA}
+\usepackage{booktabs,tabularx,array,longtable,multirow}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc,shapes.geometric}
+\usepackage{pgfplots,pgfplotstable}
+\pgfplotsset{compat=1.18}
+\usepackage[most]{tcolorbox}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{lastpage}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue,pdftitle={VEGA-RAG CRAG-MM Task 2 真实多轮性能对比实验报告},pdfauthor={俞凡}}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{muted}VEGA-RAG / CRAG-MM Task 2}
+\fancyhead[R]{\small\color{muted}真实双 A800 消融实验}
+\fancyfoot[C]{\small\color{muted}\thepage\ / \pageref{LastPage}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.45em}
+\setlist[itemize]{leftmargin=1.5em,itemsep=0.25em,topsep=0.25em}
+\ctexset{
+  section={format=\Large\bfseries\color{navy},beforeskip=1.1em,afterskip=0.55em},
+  subsection={format=\large\bfseries\color{ink},beforeskip=0.85em,afterskip=0.4em}
+}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+\newtcolorbox{keybox}[1][]{enhanced,boxrule=0pt,arc=3pt,colback=panel,left=4mm,right=4mm,top=3mm,bottom=3mm,borderline west={3pt}{0pt}{blue},#1}
+\newtcolorbox{warnbox}[1][]{enhanced,boxrule=0pt,arc=3pt,colback=orange!7,left=4mm,right=4mm,top=3mm,bottom=3mm,borderline west={3pt}{0pt}{orange},#1}
+\newtcolorbox{resultbox}[1][]{enhanced,boxrule=0pt,arc=3pt,colback=green!6,left=4mm,right=4mm,top=3mm,bottom=3mm,borderline west={3pt}{0pt}{green},#1}
+\newcommand{\pct}[1]{\pgfmathprintnumber[fixed,precision=1]{#1}\%}
+\newcommand{\pill}[2]{\tikz[baseline=(X.base)]\node[rounded corners=4pt,fill=#1!12,text=#1,inner xsep=5pt,inner ysep=2pt,font=\bfseries\footnotesize] (X) {#2};}
+\pgfplotstableread[col sep=comma]{vega_assets/metrics_primary_20.csv}\primarydata
+\pgfplotstableread[col sep=comma]{vega_assets/metrics_all_30.csv}\alldata
+\pgfplotstableread[col sep=comma]{vega_assets/system_metrics.csv}\systemdata
+
+\begin{document}
+\pagenumbering{gobble}
+\begin{titlepage}
+  \thispagestyle{empty}
+  \pagecolor{navy}\color{white}
+  \vspace*{1.3cm}
+  {\Large\bfseries 暑期实训中期汇报研究报告}\par
+  \vspace{2.2cm}
+  {\fontsize{31}{38}\selectfont\bfseries VEGA-RAG}\par
+  \vspace{0.35cm}
+  {\fontsize{20}{26}\selectfont CRAG-MM Task 2 真实多轮性能对比实验}\par
+  \vspace{0.8cm}
+  {\large 双 A800 成对运行 · 固定 30 样本 · 覆盖率约束校准 · 版本盲化等价类复核}\par
+  \vfill
+  \begin{tikzpicture}
+    \node[draw=white!35,fill=white, text=navy,rounded corners=7pt,minimum width=0.29\textwidth,minimum height=2.1cm,align=center] at (0,0) {\Large\bfseries 4\par\small 正式成对轮次};
+    \node[draw=white!35,fill=white, text=navy,rounded corners=7pt,minimum width=0.29\textwidth,minimum height=2.1cm,align=center] at (5.7,0) {\Large\bfseries 240\par\small 正式模型输出};
+    \node[draw=white!35,fill=white, text=navy,rounded corners=7pt,minimum width=0.29\textwidth,minimum height=2.1cm,align=center] at (11.4,0) {\Large\bfseries 47\par\small 唯一回答类复核};
+  \end{tikzpicture}
+  \vfill
+  {\large 个人负责人：俞凡}\par
+  {\normalsize 2026 年 7 月 16 日}\par
+  \vspace{0.5cm}
+  {\small 所有结论来自真实落盘结果；未使用伪实验或虚构提升。}\par
+\end{titlepage}
+\pagenumbering{arabic}
+\nopagecolor\color{ink}
+
+\section*{执行摘要}
+\begin{keybox}
+\textbf{一句话结论：}覆盖率约束下，校准拒答能够减少错误但自信的回答，却没有提高正确答案数量；FULL 在本次 30 条真实分布中没有触发追加检索，最终与 A3 完全等价。
+\end{keybox}
+
+\begin{tabularx}{\textwidth}{@{}Y C C C C@{}}
+\toprule
+主评测 20 条 & Accuracy & Missing & Hallucination & Truthfulness \\
+\midrule
+B0 & 30\% & 0\% & 70\% & -0.40 \\
+A1 / A2 & 30\% & 5\% & 65\% & -0.35 \\
+A3 / FULL & 25\% & 20\% & 55\% & -0.30 \\
+\bottomrule
+\end{tabularx}
+
+\vspace{0.7em}
+\begin{resultbox}
+\textbf{可汇报的真实发现}
+\begin{itemize}
+  \item A1/A2 相比 B0：Accuracy 不变，Hallucination 下降 5 个百分点，Truthfulness 上升 0.05；变化来自模型自发拒答，不是新增正确答案。
+  \item A3/FULL 相比 B0：Hallucination 下降 15 个百分点，Truthfulness 上升 0.10，但 Accuracy 同时下降 5 个百分点。
+  \item A3 的 4 次主评测拒答中，3 次避免了原本的错误回答，1 次拒掉原本正确答案；这正是选择性预测的覆盖率与风险权衡。
+  \item 主评测仅 20 条，McNemar 检验均为 $p=1.0$；所有提升都应表述为趋势，不可宣称统计显著。
+\end{itemize}
+\end{resultbox}
+
+\section{研究问题与消融结构}
+本研究不是简单比较不同 Prompt，而是把多模态检索增强生成拆成三个可独立审计的控制点：实体一致性、按需追加检索、校准拒答。
+
+\begin{center}
+\begin{tikzpicture}[node distance=7mm and 7mm,box/.style={rounded corners=4pt,draw=line,fill=panel,minimum height=11mm,minimum width=29mm,align=center,font=\small\bfseries},arr/.style={-{Stealth[length=2mm]},thick,draw=muted}]
+  \node[box] (b0) {B0\\原始证据顺序};
+  \node[box,right=of b0] (a1) {A1\\实体一致性重排};
+  \node[box,right=of a1] (a2) {A2\\中置信追加检索};
+  \node[box,right=of a2] (a3) {A3\\低置信/冲突拒答};
+  \draw[arr] (b0)--(a1); \draw[arr] (a1)--(a2); \draw[arr] (a2)--(a3);
+  \node[box,below=9mm of $(a1)!0.5!(a2)$,fill=blue!8,draw=blue] (full) {FULL\\三路门控组合};
+  \draw[arr] (a1.south) |- (full.west); \draw[arr] (a3.south) |- (full.east);
+\end{tikzpicture}
+\end{center}
+
+\begin{tabularx}{\textwidth}{@{}lYY@{}}
+\toprule
+版本 & 真实动作 & 本轮要回答的问题 \\
+\midrule
+B0 & Image KG + Web，各一次搜索 & 原始基线是否稳定可复现？ \\
+A1 & 按实体分组，结合图像分数、Web 支持和问题属性重排 & 是否减少错实体？ \\
+A2 & 仅在 $\tau_{low}<s<\tau_{high}$ 时增加一次 Web 搜索 & 额外证据是否值得成本？ \\
+A3 & $s\leq\tau_{low}$ 或数值冲突时跳过生成并拒答 & 是否减少错误但自信回答？ \\
+FULL & 高置信回答、中置信扩展、低置信/冲突拒答 & 三个模块组合后能否形成净收益？ \\
+\bottomrule
+\end{tabularx}
+
+\section{实验设计与防止结果泄漏}
+\subsection{固定样本与双卡成对运行}
+\begin{itemize}
+  \item 数据：CRAG-MM single-turn validation 固定 manifest，共 30 条；seed 为 \texttt{20260712}。
+  \item 校准：manifest 前 10 条；主评测：后 20 条；全 30 条仅作为含校准样本的补充结果。
+  \item 模型：同一 Llama-3.2-11B-Vision-Instruct 本地权重；GPU0/GPU1 分别运行同轮基线与变体。
+  \item 每轮启动差均小于 0.002 秒；每侧均为 30 条 trace v3、30 条结果、退出状态 0。
+  \item 四轮 B0 回答达到 30/30 完全一致，说明 temperature=0 的当前管线具备可复现性。
+\end{itemize}
+
+\subsection{一个值得汇报的校准失败模式}
+原始目标按 Truthfulness、Accuracy、较低 Missing 顺序选择阈值。前 10 条真实校准后，无约束最优为 $\tau_{low}=0.5,\tau_{high}=0.6$，因为 10/10 全部拒答得到 Truthfulness=0，高于当前回答系统的 -0.2。
+
+\begin{warnbox}
+\textbf{研究洞察：}Truthfulness 本身会奖励“安全但无用”的全拒答策略。因此在查看后 20 条主评测结果之前，预先加入回答覆盖率 $1-Missing\geq70\%$ 的可行性约束，再在可行候选中优化原目标。
+\end{warnbox}
+
+\begin{tabularx}{\textwidth}{@{}YCCCC@{}}
+\toprule
+校准方案 & $\tau_{low}/\tau_{high}$ & 覆盖率 & Accuracy & Truthfulness \\
+\midrule
+无约束诊断（保留但不采用） & 0.5 / 0.6 & 0\% & 0\% & 0.00 \\
+覆盖率约束正式冻结 & 0.2 / 0.3 & 80\% & 30\% & -0.20 \\
+\bottomrule
+\end{tabularx}
+
+正式阈值文件 SHA-256：\texttt{fcb0fe48...e45cdbc}。15 个网格候选中 12 个满足覆盖率约束，3 个被排除；正式轮开始后阈值未再改变。
+
+\section{运行验收与失败证据}
+\begin{tabularx}{\textwidth}{@{}lCCCY@{}}
+\toprule
+轮次 & 双侧退出 & Trace/结果 & 接受状态 & 说明 \\
+\midrule
+R1 B0 vs A1 & 0/0 & 30/30, 30/30 & \pill{green}{接受} & 两侧均每样本 2 次搜索 \\
+R2 B0 vs A2 & 0/0 & 30/30, 30/30 & \pill{green}{接受} & A2 仅 1 条扩展，新增 4 条证据 \\
+R3 B0 vs A3 & 0/0 & 30/30, 30/30 & \pill{red}{排除} & 特殊 token 污染标准拒答字符串 \\
+R3b B0 vs A3 & 0/0 & 30/30, 30/30 & \pill{red}{排除} & 通用归一化覆盖冲突拒答原因 \\
+R3c B0 vs A3 & 0/0 & 30/30, 30/30 & \pill{green}{接受} & 5 次拒答均跳过生成且原因正确 \\
+R4 B0 vs FULL & 0/0 & 30/30, 30/30 & \pill{green}{接受} & 自然 expand=0，FULL 与 A3 等价 \\
+\bottomrule
+\end{tabularx}
+
+\begin{keybox}
+两次 R3 排除不是伪造失败，而是严格验收发现的工程问题。修复均遵循失败测试先行：本地和远端最终为 62/62 单元测试通过；旧目录和日志全部保留，不覆盖结果。
+\end{keybox}
+
+\section{主评测 20 条：质量结果}
+\begin{center}
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.96\textwidth,height=7.0cm,
+  ybar,bar width=6pt,ymin=0,ymax=0.85,
+  ylabel={比例（0--1）},
+  symbolic x coords={b0,a1,a2,a3,full},xtick=data,
+  x tick label style={font=\small\bfseries},
+  legend style={at={(0.5,1.03)},anchor=south,legend columns=3,draw=none},
+  grid=major,major grid style={draw=line},axis line style={draw=muted},
+]
+\addplot[fill=blue!75,draw=blue] table[x=version,y=accuracy]{\primarydata};
+\addplot[fill=orange!70,draw=orange] table[x=version,y=missing]{\primarydata};
+\addplot[fill=red!65,draw=red] table[x=version,y=hallucination]{\primarydata};
+\legend{Accuracy,Missing,Hallucination}
+\end{axis}
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.78\textwidth,height=5.4cm,
+  ybar,bar width=16pt,ymin=-0.5,ymax=0.02,
+  ylabel={Truthfulness},
+  symbolic x coords={b0,a1,a2,a3,full},xtick=data,
+  grid=major,major grid style={draw=line},axis line style={draw=muted},
+  nodes near coords,nodes near coords style={font=\footnotesize,/pgf/number format/fixed,/pgf/number format/precision=2},
+]
+\addplot[fill=cyan!75,draw=cyan] table[x=version,y=truthfulness]{\primarydata};
+\end{axis}
+\end{tikzpicture}
+\end{center}
+
+\pgfplotstabletypeset[
+  col sep=comma,
+  columns={version,total,correct,missing_count,hallucination_count,accuracy,missing,hallucination,truthfulness},
+  columns/version/.style={string type,column name=版本},
+  columns/total/.style={column name=N},
+  columns/correct/.style={column name=C},
+  columns/missing_count/.style={column name=M},
+  columns/hallucination_count/.style={column name=H},
+  columns/accuracy/.style={column name=Accuracy,fixed,precision=2},
+  columns/missing/.style={column name=Missing,fixed,precision=2},
+  columns/hallucination/.style={column name=Halluc.,fixed,precision=2},
+  columns/truthfulness/.style={column name=Truth.,fixed,precision=2},
+  every head row/.style={before row=\toprule,after row=\midrule},
+  every last row/.style={after row=\bottomrule},
+  every row no 0/.style={font=\small},
+] {vega_assets/metrics_primary_20.csv}
+
+\subsection{统计解释}
+\begin{itemize}
+  \item A1/A2 的 Accuracy 差为 0；Truthfulness 差为 +0.05，10,000 次配对 bootstrap 95\% CI 为 [0.00, 0.15]。
+  \item A3/FULL 的 Accuracy 差为 -0.05，95\% CI 为 [-0.15, 0.00]；Truthfulness 差为 +0.10，95\% CI 为 [-0.10, 0.30]。
+  \item A1/A2 的正确性 McNemar 无差异对；A3/FULL 仅有 1 个“基线正确、变体非正确”差异对，双侧精确 $p=1.0$。
+\end{itemize}
+
+\section{错误转移与拒答质量}
+主评测中实体错误仍是最大问题：B0 为 7 条，A1/A2 降为 6 条，但没有形成新增正确答案。A3/FULL 的四次拒答产生如下转移：
+
+\begin{tabularx}{\textwidth}{@{}YCCC@{}}
+\toprule
+转移 & 数量 & 解释 & 评价 \\
+\midrule
+incorrect $\rightarrow$ missing & 3 & 阻止错误但自信回答 & 有益拒答 \\
+correct $\rightarrow$ missing & 1 & Ardvreck Castle 样本低分但原答案正确 & 有害拒答 \\
+incorrect $\rightarrow$ incorrect & 8 & 门控未覆盖的大量实体/事实错误 & 仍需改进 \\
+partial $\rightarrow$ partial & 3 & 证据覆盖不足未被门控改变 & 仍需改进 \\
+\bottomrule
+\end{tabularx}
+
+\begin{resultbox}
+\textbf{拒答精度（主评测）：}3/4 拒答避免了幻觉，1/4 错拒正确答案。它说明“冲突检测”比单纯低分更有价值：4 个冲突拒答中有 3 个位于主评测且阻止错误；唯一低置信拒答恰好拒掉正确的建筑比较答案。
+\end{resultbox}
+
+\subsection{代表性真实样本}
+\begin{tabularx}{\textwidth}{@{}p{2.8cm}YY@{}}
+\toprule
+案例 & 真实现象 & 研究含义 \\
+\midrule
+发动机类型 & B0 回答 2.7L 直四，参考为 V8；A3 因数值冲突拒答 & 冲突门控避免明确错误 \\
+建筑寿命 & B0 正确回答 Ardvreck Castle 更久；A3 因实体分数 0 拒答 & 低分不等于错误，需改善置信建模 \\
+台湾博物馆 GDP & 多版本把台湾误识别成美国 & 当前瓶颈是视觉实体识别，不是 Web 证据数量 \\
+A2 唯一扩展 & 30 条仅 1 条触发扩展，新增 4 条 Web 证据但语义标签未改善 & 追加检索的触发覆盖不足且边际收益为零 \\
+\bottomrule
+\end{tabularx}
+
+\section{系统成本与 GPU 性能}
+\pgfplotstabletypeset[
+  col sep=comma,
+  columns={run_id,wall_time_seconds_including_load,batch_latency_p50_ms,batch_latency_p95_ms,mean_search_calls,answer_count,expand_count,abstain_count,gpu_peak_memory_mib,gpu_peak_utilization_pct},
+  columns/run_id/.style={string type,column name=Run},
+  columns/wall_time_seconds_including_load/.style={column name=Wall(s),fixed,precision=1},
+  columns/batch_latency_p50_ms/.style={column name=P50(ms),fixed,precision=0},
+  columns/batch_latency_p95_ms/.style={column name=P95(ms),fixed,precision=0},
+  columns/mean_search_calls/.style={column name=Search,fixed,precision=3},
+  columns/answer_count/.style={column name=Ans},
+  columns/expand_count/.style={column name=Exp},
+  columns/abstain_count/.style={column name=Abs},
+  columns/gpu_peak_memory_mib/.style={column name=Mem(MiB),fixed,precision=0},
+  columns/gpu_peak_utilization_pct/.style={column name=GPU\%,fixed,precision=0},
+  every head row/.style={before row=\toprule,after row=\midrule},
+  every last row/.style={after row=\bottomrule},
+  every row no 0/.style={font=\scriptsize},
+] {vega_assets/system_metrics.csv}
+
+\begin{keybox}
+\textbf{时延口径：}P50/P95 来自 trace 的批处理响应周期；同一 vLLM batch 内样本共享生成时间，不等同于严格单请求 latency。Wall time 包含索引与模型加载，P50/P95 不包含加载。所有正式 run 的峰值显存均约 38,686 MiB，GPU 峰值利用率均为 100\%。
+\end{keybox}
+
+系统成本没有显示 A2 的显著负担，因为冻结阈值后仅 1/30 扩展，平均搜索调用从 2.000 上升到 2.033。A3/FULL 跳过 5 条生成，但整体 wall time 仍受索引和模型加载主导，因此不能据此宣称显著加速。
+
+\section{全 30 条补充结果}
+该范围包含 10 条校准样本，只用于描述，不作为无偏主结论。
+
+\pgfplotstabletypeset[
+  col sep=comma,
+  columns={version,total,correct,missing_count,hallucination_count,accuracy,missing,hallucination,truthfulness,coverage},
+  columns/version/.style={string type,column name=版本},
+  columns/total/.style={column name=N},
+  columns/correct/.style={column name=C},
+  columns/missing_count/.style={column name=M},
+  columns/hallucination_count/.style={column name=H},
+  columns/accuracy/.style={column name=Acc.,fixed,precision=3},
+  columns/missing/.style={column name=Miss.,fixed,precision=3},
+  columns/hallucination/.style={column name=Hall.,fixed,precision=3},
+  columns/truthfulness/.style={column name=Truth.,fixed,precision=3},
+  columns/coverage/.style={column name=Cov.,fixed,precision=3},
+  every head row/.style={before row=\toprule,after row=\midrule},
+  every last row/.style={after row=\bottomrule},
+] {vega_assets/metrics_all_30.csv}
+
+全 30 条趋势与主评测一致：A3/FULL 的 Hallucination 从 0.767 降到 0.633，Truthfulness 从 -0.567 提高到 -0.467，但 Accuracy 从 0.200 降到 0.167。
+
+\section{结论、创新点与下一阶段}
+\subsection{可以站得住的创新点}
+\begin{enumerate}[leftmargin=1.6em]
+  \item \textbf{覆盖率约束校准：}不是追求单一 Truthfulness 最大，而是先限制系统最低可用覆盖率，避免全拒答退化。
+  \item \textbf{响应等价类复核：}150 个版本答案按“同问题、同文本”压缩为 47 类，避免同一答案因版本不同被打出不一致标签，同时保留可逆映射。
+  \item \textbf{行为级验收：}不仅看最终分数，还检查搜索次数、gate action、拒答原因、是否真正跳过生成、冻结阈值哈希和失败目录。
+  \item \textbf{负结果可解释：}FULL 没有虚构提升。真实结果表明当前主要瓶颈仍是视觉实体识别；仅增加 Web 证据无法修复错实体。
+\end{enumerate}
+
+\subsection{下一阶段优先级}
+\begin{tabularx}{\textwidth}{@{}lYY@{}}
+\toprule
+优先级 & 方案 & 验证方式 \\
+\midrule
+P0 & 用独立视觉实体分类置信度替代当前弱一致性分数 & 检查 Ardvreck 类正确低分是否减少 \\
+P1 & 冲突检测从“数字集合不相交”升级为属性对齐冲突 & 对发动机、年份、长度分别建立属性槽位 \\
+P1 & A2 触发器纳入实体 margin 与 Web 支持，而不只看总分区间 & 提高真正需要补证样本的召回率 \\
+P2 & 扩大到完整 validation 或重复 seed & 提升统计功效并验证阈值迁移性 \\
+\bottomrule
+\end{tabularx}
+
+\begin{warnbox}
+\textbf{汇报边界：}本报告的语义指标来自单人固定量表复核，不是 CRAG-MM 官方 leaderboard 裁判；复核过程使用匿名 response ID，但评审者此前接触过部分运行上下文，因此不宣称严格双盲。所有数值、负结果和失败运行均来自真实文件。
+\end{warnbox}
+
+\section*{附录：公式与可复核产物}
+\[
+\begin{aligned}
+Accuracy&=\frac{C}{N}, & Missing&=\frac{M}{N},\\
+Hallucination&=\frac{H}{N}, & Truthfulness&=\frac{2C+M}{N}-1=Accuracy-Hallucination.
+\end{aligned}
+\]
+
+\begin{itemize}
+  \item 冻结阈值与无约束对照：\path{artifacts/week2/vega_real_ablation/calibration/}
+  \item 真实正式轮与失败轮：\path{artifacts/week2/vega_real_ablation/round_*}
+  \item 复核映射、标签、bootstrap、McNemar、错误转移：\path{artifacts/week2/vega_real_ablation/comparison/}
+  \item PDF 图表数据与验收清单：\path{output/pdf/vega_assets/}
+\end{itemize}
+
+\vfill
+\begin{center}\color{muted}\small 本报告由可复核运行产物自动汇总；未 commit、未 push、未创建 PR。\end{center}
+\end{document}
