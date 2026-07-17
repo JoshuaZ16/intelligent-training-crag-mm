@@ -1,0 +1,11 @@
+scope,version,refusal_count,avoided_hallucination,harmful_refusal,baseline_also_missing
+primary_20,b0,0,0,0,0
+primary_20,a1,1,1,0,0
+primary_20,a2,1,1,0,0
+primary_20,a3,4,3,1,0
+primary_20,full,4,3,1,0
+all_30,b0,1,0,0,1
+all_30,a1,2,1,0,1
+all_30,a2,2,1,0,1
+all_30,a3,6,4,1,1
+all_30,full,6,4,1,1

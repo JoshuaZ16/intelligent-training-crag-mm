@@ -1,0 +1,664 @@
+\documentclass[11pt,a4paper]{ctexart}
+\usepackage[a4paper,top=18mm,bottom=18mm,left=18mm,right=18mm,headheight=15pt]{geometry}
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds,shapes.geometric}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[most]{tcolorbox}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{amsmath}
+\usepackage{caption}
+\usepackage{float}
+
+\setmainfont{Arial}
+\setCJKmainfont[
+  Path=/Users/yufan/Library/Fonts/,
+  BoldFont=NotoSansCJKsc-Bold.otf
+]{NotoSansCJKsc-Regular.otf}
+\setCJKsansfont[
+  Path=/Users/yufan/Library/Fonts/,
+  BoldFont=NotoSansCJKsc-Bold.otf
+]{NotoSansCJKsc-Regular.otf}
+\setmonofont{Menlo}
+
+\definecolor{Navy}{HTML}{12355B}
+\definecolor{Blue}{HTML}{1F6FEB}
+\definecolor{Teal}{HTML}{168B78}
+\definecolor{Orange}{HTML}{D97706}
+\definecolor{Red}{HTML}{C2414B}
+\definecolor{Ink}{HTML}{172033}
+\definecolor{Muted}{HTML}{667085}
+\definecolor{Line}{HTML}{D9E2EC}
+\definecolor{PaleBlue}{HTML}{EEF5FF}
+\definecolor{PaleTeal}{HTML}{EAF8F3}
+\definecolor{PaleOrange}{HTML}{FFF5E8}
+\definecolor{PaleRed}{HTML}{FFF0F1}
+\definecolor{Paper}{HTML}{F8FAFC}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=Navy,
+  urlcolor=Blue,
+  pdftitle={CRAG-MM Task 2 云端运行日志与中期创新方案},
+  pdfauthor={第20组 俞凡}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{Muted}CRAG-MM · 第20组 · Task 2}
+\fancyhead[R]{\small\color{Muted}真实 validation 30 样例}
+\fancyfoot[L]{\small\color{Muted}2026-07-16}
+\fancyfoot[R]{\small\color{Muted}\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\titleformat{\section}{\fontsize{22}{28}\selectfont\bfseries\color{Navy}}{}{0pt}{}
+\titleformat{\subsection}{\fontsize{14}{19}\selectfont\bfseries\color{Ink}}{}{0pt}{}
+\titlespacing*{\section}{0pt}{0pt}{10pt}
+\titlespacing*{\subsection}{0pt}{8pt}{5pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\setlist[itemize]{leftmargin=1.5em,itemsep=3pt,topsep=3pt}
+\setlist[enumerate]{leftmargin=1.7em,itemsep=3pt,topsep=3pt}
+
+\newtcolorbox{callout}[1][]{
+  enhanced,breakable,colback=PaleBlue,colframe=Blue!35,
+  boxrule=0.6pt,arc=2mm,left=4mm,right=4mm,top=3mm,bottom=3mm,#1
+}
+\newtcolorbox{riskbox}[1][]{
+  enhanced,breakable,colback=PaleRed,colframe=Red!40,
+  boxrule=0.6pt,arc=2mm,left=4mm,right=4mm,top=3mm,bottom=3mm,#1
+}
+\newtcolorbox{greenbox}[1][]{
+  enhanced,breakable,colback=PaleTeal,colframe=Teal!40,
+  boxrule=0.6pt,arc=2mm,left=4mm,right=4mm,top=3mm,bottom=3mm,#1
+}
+\newcommand{\metric}[5]{%
+\begin{minipage}[t]{0.235\textwidth}
+\begin{tcolorbox}[height=34mm,colback=#5,colframe=#4!38,boxrule=0.6pt,arc=2mm,left=3mm,right=2mm,top=2mm,bottom=2mm]
+{\fontsize{24}{26}\selectfont\bfseries\color{#4}#1}\par
+{\small\bfseries\color{Ink}#2}\par
+{\scriptsize\color{Muted}#3}
+\end{tcolorbox}
+\end{minipage}}
+
+\newcommand{\statuspill}[2]{\tikz[baseline=-0.6ex]\node[rounded corners=1.5mm,fill=#1!12,text=#1,inner xsep=2.2mm,inner ysep=0.8mm,font=\scriptsize\bfseries]{#2};}
+\newcommand{\codeinline}[1]{\texttt{\small #1}}
+
+\begin{document}
+
+% Cover
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture,overlay]
+  \fill[Navy] (current page.north west) rectangle ([yshift=-63mm]current page.north east);
+  \fill[Blue] ([xshift=18mm,yshift=-20mm]current page.north west) rectangle ([xshift=22mm,yshift=-49mm]current page.north west);
+  \fill[PaleBlue] ([xshift=18mm,yshift=18mm]current page.south west) rectangle ([xshift=-18mm,yshift=34mm]current page.south east);
+  \draw[Blue,line width=1.2pt] ([xshift=18mm,yshift=34mm]current page.south west) -- ([xshift=-18mm,yshift=34mm]current page.south east);
+\end{tikzpicture}
+\vspace*{16mm}
+{\color{white}\small\bfseries CRAG-MM · 第20组 · 中期汇报证据包}\par
+\vspace{10mm}
+{\color{white}\fontsize{31}{39}\selectfont\bfseries Task 2 云端真实运行日志}\par
+\vspace{3mm}
+{\color{white}\fontsize{19}{26}\selectfont 与 VEGA-RAG 中期创新方案}\par
+\vspace{27mm}
+
+\begin{minipage}{0.61\textwidth}
+{\Large\bfseries\color{Ink}一句话结论}\par
+\vspace{3mm}
+{\fontsize{16}{24}\selectfont\color{Ink}
+双 A800 环境上的固定 30 样例 Task 2 已以退出状态 0 完成；工程闭环成立，质量瓶颈已从“能否运行”收敛到“实体识别、证据一致性与拒答校准”。}
+\end{minipage}
+\hfill
+\begin{minipage}{0.31\textwidth}
+\begin{tcolorbox}[colback=white,colframe=Blue!25,boxrule=.6pt,arc=2mm]
+\small
+\textbf{报告人：}俞凡\\
+\textbf{日期：}2026-07-16\\
+\textbf{后端：}vLLM 0.7.3\\
+\textbf{模型：}Llama 3.2 11B Vision\\
+\textbf{数据：}validation v0.1.2
+\end{tcolorbox}
+\end{minipage}
+
+\vfill
+{\small\color{Muted}
+本报告区分三类证据：真实运行事实、非官方快速人工复核、尚待消融验证的研究假设。}
+\clearpage
+
+% 1
+\section{结果先行：Task 2 已跑通，质量问题也被看见}
+
+\begin{center}
+\metric{30/30}{样例与 trace 一致}{真实固定样例}{Blue}{PaleBlue} \hfill
+\metric{0}{运行错误}{status 全部为 ok}{Teal}{PaleTeal} \hfill
+\metric{3:14.88}{墙钟耗时}{含环境初始化}{Orange}{PaleOrange} \hfill
+\metric{38,686 MiB}{GPU0 峰值显存}{GPU1 保持空闲}{Red}{PaleRed}
+\end{center}
+
+\vspace{4mm}
+\begin{callout}
+\textbf{完成性证据。} 正式命令退出状态为 0；\codeinline{run\_config.json}、manifest、trace、CSV 与分数文件均覆盖同一组 30 条样例。run config 与 manifest 的 source index 顺序一致，trace 按 manifest 顺序记录；CSV 的 query 集合一致，但输出排序不同。远端最终测试为 32/32 通过。
+\end{callout}
+
+\begin{riskbox}
+\textbf{不能包装成“性能提升”。} 仓库关闭了语义裁判，精确匹配为 0/30；它不是官方 leaderboard 分数。单人快速人工复核仅用于定位问题：核心正确 7、部分覆盖 6、不正确 17，必须在后续双人复核或官方评测后再形成性能结论。
+\end{riskbox}
+
+\subsection{这次中期汇报可以安全地说什么}
+\begin{itemize}
+  \item 可以说：Task 2 的图像 KG、Web 检索、11B 多模态生成、trace 和结果落盘已形成真实闭环。
+  \item 可以说：29/30 样例同时获得图像与 Web 证据，检索调用无异常；回答质量的主要瓶颈是实体错认而非服务不可用。
+  \item 不应说：当前系统已优于 Vision 或 Task 1；本轮没有完成同清单的成对消融。
+  \item 下一步要证明：VEGA-RAG 的证据一致性门控能否减少实体错认，并在可控延迟下改善真实性。
+\end{itemize}
+\clearpage
+
+% 2
+\section{实验对象与可复现配置}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{31mm} X X}
+\toprule
+项目 & 本次真实配置 & 可复现证据 \\
+\midrule
+实例 & Ubuntu 22.04.3；2 张 NVIDIA A800-SXM4-40GB；32 逻辑 CPU；62 GiB RAM & \path{environment-check.log}、GPU telemetry \\
+运行方式 & 单卡 GPU0；\codeinline{tensor\_parallel\_size=1}；GPU1 不参与该基线 & 运行期 GPU0 38,686 MiB，GPU1 10 MiB \\
+后端 & Python 3.10.20；vLLM 0.7.3；Torch 2.5.1+cu124；Transformers 4.49.0 & \path{pip-check-after-pin.log} \\
+生成模型 & \path{unsloth/Llama-3.2-11B-Vision-Instruct}，Mllama 架构，五个 safetensors 分片 & 五分片 SHA-256 与公开 LFS OID 一致 \\
+检索模型 & BAAI BGE large en v1.5；OpenAI CLIP ViT-L/14 336 & 离线完整 pipeline 验证退出 0 \\
+索引 & image 34,557 条；web 904,899 条 & Chroma 实际打开、计数验证 \\
+数据 & 387 条 validation 分片中按 seed 20260712 分层选 30 条 & 五个 domain、五个 query category \\
+图像输入 & 23 条官方 Wikimedia 1280px 缩略图缓存；7 条 Parquet 内嵌图像 & \path{image_prefetch.json}，失败 0 \\
+\bottomrule
+\end{tabularx}
+
+\vspace{4mm}
+\begin{greenbox}
+\textbf{模型来源说明。} 官方 Meta 仓库匿名访问返回 401，因此本次使用公开 Unsloth 镜像，并公开记录来源、架构和 LFS 哈希。报告不把该镜像描述为“官方授权权重”。
+\end{greenbox}
+
+\begin{callout}
+\textbf{环境取舍。} 40GB 单卡足以容纳 19.91 GiB 模型权重、1.85 GiB 激活峰值和 11.78 GiB KV cache；双卡中的第二张卡更适合并行跑成对基线，而不是在当前硬编码单卡设置下空耗。
+\end{callout}
+\clearpage
+
+% 3
+\section{从输入到答案：真实执行链路}
+
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=7mm and 8mm,
+  box/.style={rounded corners=2mm,draw=Line,fill=white,minimum width=28mm,minimum height=13mm,align=center,font=\small\bfseries,text=Ink},
+  sub/.style={font=\scriptsize\color{Muted}},
+  arr/.style={-{Stealth[length=2.2mm]},thick,draw=Blue}
+]
+\node[box,fill=PaleBlue] (manifest) {固定 manifest\\[-1mm]{\scriptsize\color{Muted}30 条，seed 固定}};
+\node[box,right=of manifest] (image) {图像准备\\[-1mm]{\scriptsize\color{Muted}23 cache + 7 embedded}};
+\node[box,right=of image,fill=PaleTeal] (kg) {Image KG\\[-1mm]{\scriptsize\color{Muted}CLIP + 34,557}};
+\node[box,below=of kg,fill=PaleTeal] (web) {Web 检索\\[-1mm]{\scriptsize\color{Muted}BGE + 904,899}};
+\node[box,right=of kg] (prompt) {证据分层 Prompt\\[-1mm]{\scriptsize\color{Muted}KG 与 Web 不混写}};
+\node[box,right=of prompt,fill=PaleOrange] (vllm) {11B vLLM\\[-1mm]{\scriptsize\color{Muted}8192 context}};
+\node[box,right=of vllm] (trace) {答案与 trace\\[-1mm]{\scriptsize\color{Muted}ID、分数、延迟}};
+\draw[arr] (manifest) -- (image);
+\draw[arr] (image) -- (kg);
+\draw[arr] (image) |- (web);
+\draw[arr] (kg) -- (prompt);
+\draw[arr] (web) -| (prompt);
+\draw[arr] (prompt) -- (vllm);
+\draw[arr] (vllm) -- (trace);
+\end{tikzpicture}
+}
+\end{center}
+
+\subsection{正式命令}
+\begin{tcolorbox}[colback=Ink,colframe=Ink,arc=2mm]
+\color{white}\ttfamily\small
+python scripts/week2\_experiment.py \textbackslash\\
+\quad --mode task2 --backend vllm --num-samples 30 \textbackslash\\
+\quad --seed 20260712 \textbackslash\\
+\quad --dataset-path local\_data/.../validation-00004-of-00005.parquet \textbackslash\\
+\quad --output-dir artifacts/week2/real\_task2\_30
+\end{tcolorbox}
+
+\subsection{一致性门禁}
+\begin{tabularx}{\textwidth}{X c c c c}
+\toprule
+证据对象 & manifest & trace & all CSV & score total \\
+\midrule
+真实数量 & 30 & 30 & 30 & 30 \\
+门禁结果 & \statuspill{Teal}{PASS} & \statuspill{Teal}{PASS} & \statuspill{Teal}{PASS} & \statuspill{Teal}{PASS} \\
+\bottomrule
+\end{tabularx}
+
+\begin{callout}
+正式运行内部计时为 173.01 秒；外层墙钟为 194.88 秒。差值来自 Conda 包装、进程创建与收尾。两者均保留，避免只报更好看的数字。
+\end{callout}
+\clearpage
+
+% 4
+\section{GPU 证据：单卡能跑满，第二张卡可用于成对实验}
+
+\begin{center}
+\begin{tikzpicture}
+\begin{axis}[
+  width=\textwidth,height=67mm,
+  xlabel={正式运行开始后的秒数},ylabel={显存使用量 (MiB)},
+  xmin=0,xmax=185,ymin=0,ymax=43000,
+  grid=major,grid style={Line!60},
+  tick label style={font=\scriptsize},label style={font=\small},
+  legend style={at={(0.02,0.98)},anchor=north west,font=\scriptsize,draw=none,fill=white},
+  every axis plot/.append style={very thick}
+]
+\addplot[Blue] table[x=seconds,y=memory_mib,col sep=comma]{assets/gpu0.csv};
+\addlegendentry{GPU0，正式运行}
+\addplot[Muted,dashed] table[x=seconds,y=memory_mib,col sep=comma]{assets/gpu1.csv};
+\addlegendentry{GPU1，空闲}
+\draw[Orange,dashed] (axis cs:0,38686) -- (axis cs:185,38686)
+  node[pos=.76,above,font=\scriptsize,text=Orange]{峰值 38,686 MiB};
+\end{axis}
+\end{tikzpicture}
+\end{center}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{28mm} *{4}{>{\centering\arraybackslash}X}}
+\toprule
+设备 & 峰值显存 & 峰值利用率 & 峰值功耗 & 峰值温度 \\
+\midrule
+GPU0 A800 & 38,686 MiB & 100\% & 347.57 W & 53$^\circ$C \\
+GPU1 A800 & 10 MiB & 0\% & 44.01 W & 30$^\circ$C \\
+\bottomrule
+\end{tabularx}
+
+\begin{riskbox}
+\textbf{不能说“双卡加速了本次 Task 2”。} 实例能看到两张 A800，但正式命令只暴露 GPU0，vLLM 的 tensor parallel 为 1。GPU1 的正确用途是下一轮同时运行 baseline 与 ablation，保证同清单、同时间窗的成对比较。
+\end{riskbox}
+\clearpage
+
+% 5
+\section{延迟结构：生成占主导，检索门控仍有预算}
+
+\begin{center}
+\begin{tikzpicture}
+\begin{axis}[
+  ybar,bar width=7pt,width=.94\textwidth,height=73mm,
+  ylabel={毫秒},symbolic x coords={Image,Web,Generation,Total},xtick=data,
+  ymin=0,ymax=3400,grid=major,grid style={Line!60},
+  legend style={at={(0.5,1.02)},anchor=south,font=\scriptsize,draw=none,legend columns=3},
+  tick label style={font=\scriptsize},label style={font=\small},
+  nodes near coords,nodes near coords style={font=\tiny,rotate=90,anchor=west}
+]
+\addplot[fill=Teal,draw=Teal] coordinates {(Image,91.8) (Web,43.8) (Generation,1460.1) (Total,1608.3)};
+\addlegendentry{中位数}
+\addplot[fill=Orange,draw=Orange] coordinates {(Image,185.9) (Web,63.5) (Generation,2757.4) (Total,3152.8)};
+\addlegendentry{P95}
+\addplot[fill=Red,draw=Red] coordinates {(Image,858.0) (Web,175.2) (Generation,2757.4) (Total,3152.8)};
+\addlegendentry{最大值}
+\end{axis}
+\end{tikzpicture}
+\end{center}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{35mm} X X}
+\toprule
+观察 & 数据 & 含义 \\
+\midrule
+冷启动图像检索 & 最大 858.0 ms，中位 91.8 ms & 首条加载效应明显，后续稳定 \\
+Web 检索 & 中位 43.8 ms，P95 63.5 ms & 再做一次轻量一致性判断有可用预算 \\
+生成 & 中位 1,460.1 ms，P95 2,757.4 ms & 总延迟主要由生成决定 \\
+回答长度 & 中位 30 token；6 条达到或超过 75 token & 截断与跑题需要作为质量 guardrail \\
+\bottomrule
+\end{tabularx}
+
+\begin{callout}
+trace 的 generation 与 total 延迟以 batch 为单位共享，因此 30 条只有 8 组唯一值。后续 trace v3 应同时记录 batch latency 与 per-sample token throughput，避免把共享耗时误解释为单条独立耗时。
+\end{callout}
+\clearpage
+
+% 6
+\section{答案质量：双检索可用，但“检索到”不等于“答对”}
+
+\begin{minipage}[t]{0.46\textwidth}
+\begin{tikzpicture}
+\begin{axis}[
+  xbar,width=.88\linewidth,height=53mm,
+  symbolic y coords={不正确,部分覆盖,核心正确},
+  ytick={不正确,部分覆盖,核心正确},
+  xmin=0,xmax=20,grid=major,grid style={Line!60},
+  tick label style={font=\scriptsize},nodes near coords,
+  nodes near coords style={font=\small\bfseries},
+  title={单人快速复核，非官方},title style={font=\small\bfseries}
+]
+\addplot[fill=Red,draw=Red] coordinates {(17,不正确)};
+\addplot[fill=Orange,draw=Orange] coordinates {(6,部分覆盖)};
+\addplot[fill=Teal,draw=Teal] coordinates {(7,核心正确)};
+\end{axis}
+\end{tikzpicture}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.50\textwidth}
+\begin{tcolorbox}[colback=Paper,colframe=Line,boxrule=.6pt,arc=2mm]
+\textbf{最大根因不是服务错误，而是实体错认}\par
+\vspace{1mm}
+\begin{tabularx}{\linewidth}{X r}
+实体错认 & 11 \\
+部分证据覆盖 & 6 \\
+推理或事实错误 & 4 \\
+跑题或截断 & 1 \\
+不恰当拒答 & 1 \\
+核心正确 & 7 \\
+\end{tabularx}
+\end{tcolorbox}
+\end{minipage}
+
+\begin{greenbox}
+\textbf{成功样例。} “Fiat 500 设计师在 1959 年获得什么奖？”回答 Compasso d'Oro；“牛肉斯特罗加诺夫起源于哪个世纪？”回答 19 世纪；“Nakagusuku 城堡由谁建造？”回答 Gosamaru。三者与参考核心信息一致。
+\end{greenbox}
+
+\begin{riskbox}
+\textbf{失败样例。} Trithuria inconspicua 被误识别为西澳植物；台湾博物馆被误识别为美国博物馆；Jeep 与 Toyota 4Runner 的基础发动机比较结论相反。29/30 同时有两路证据仍出现 11 个实体错误，说明“多检索”本身不等于“证据一致”。
+\end{riskbox}
+
+\small\color{Muted}
+复核口径：1 名复核者逐条对照 ground truth 与最终回答；只用于错误归因，不替代官方语义裁判或双人一致性标注。
+\clearpage
+
+% 7
+\section{工程排障不是花絮，而是可复现能力}
+
+\begin{longtable}{>{\bfseries}p{28mm} p{55mm} p{78mm}}
+\toprule
+失败点 & 直接证据 & 最小修复与验证 \\
+\midrule
+\endhead
+Web 索引下载极慢 & Hugging Face Xet 并发降为 1，约 0.1 MB/s & 映射 LFS OID 后用 aria2 Range 续传；5.2GB 与 3.6GB 两文件 SHA-256 完全匹配 \\
+Chroma 变量过多 & 904,899 条 Web 元数据与 34,557 条图像元数据全量 get 触发 SQLite 限制 & 改为命中 ID 的惰性元数据访问与缓存；离线真实 pipeline 返回结果，32 项测试覆盖 \\
+依赖版本冲突 & Transformers 5.14 拒绝 Torch 2.5 加载 CLIP bin & 对齐 vLLM 0.7.3 到 Transformers 4.49.0；pip check 为 0 冲突 \\
+评测 tokenizer 受限 & 评测器硬编码 Meta 1B tokenizer，离线时失败 & 优先复用本地 11B tokenizer，保留上游 fallback；目标测试通过 \\
+图像外链超时与 429 & 默认 Wikimedia 新加坡节点握手超时，原图请求触发 robot policy & 指向官方 eqiad IP；使用允许的 1280px 缩略图；规范 UA；23/23 缓存成功 \\
+SSH 会话回收 & 前台冒烟被线路断开连带终止 & tmux 守护，日志实时落盘，外层 time 写最终退出状态 \\
+\bottomrule
+\end{longtable}
+
+\begin{callout}
+\textbf{汇报价值。} 每个失败都有“症状、根因、最小修复、自动测试、真实复验”五段证据。这比只展示一个最终数字更能证明个人对实训的工程贡献。
+\end{callout}
+\clearpage
+
+% 8
+\section{创新主线：VEGA-RAG 让两路证据先对齐，再决定是否回答}
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=8mm and 8mm,
+  box/.style={rounded corners=2mm,draw=Line,fill=white,minimum width=29mm,minimum height=13mm,align=center,font=\small\bfseries},
+  arr/.style={-{Stealth[length=2.2mm]},thick,draw=Navy},
+  gate/.style={diamond,aspect=1.7,draw=Orange,fill=PaleOrange,align=center,font=\scriptsize\bfseries,inner sep=1.5mm}
+]
+\node[box,fill=PaleBlue] (image) {图像实体锚点\\\scriptsize top entity + margin};
+\node[box,below left=of image,fill=PaleTeal] (kg) {Image KG\\\scriptsize entity attributes};
+\node[box,below right=of image,fill=PaleTeal] (web) {Web evidence\\\scriptsize current facts};
+\node[box,below=17mm of image] (score) {证据一致性评分\\\scriptsize entity / fact / conflict};
+\node[gate,right=of score] (gate) {自适应\\门控};
+\node[box,above right=7mm and 14mm of gate,fill=PaleTeal] (answer) {高置信回答\\\scriptsize cite trace IDs};
+\node[box,right=14mm of gate,fill=PaleBlue] (rewrite) {中置信重写\\\scriptsize expand K / query};
+\node[box,below right=7mm and 14mm of gate,fill=PaleRed] (abstain) {低置信拒答\\\scriptsize explain conflict};
+\draw[arr] (image) -- (kg);
+\draw[arr] (image) -- (web);
+\draw[arr] (kg) -- (score);
+\draw[arr] (web) -- (score);
+\draw[arr] (score) -- (gate);
+\draw[arr] (gate) -- (answer);
+\draw[arr] (gate) -- (rewrite);
+\draw[arr] (gate) -- (abstain);
+\draw[arr,dashed,Blue] (rewrite.south) |- ([yshift=-7mm]score.south) -| (kg.south);
+\end{tikzpicture}
+\end{center}
+
+\begin{callout}
+\textbf{为什么不是再堆一个检索器？} 当前系统 29/30 已同时获得图像与 Web 证据，却仍有 11 个实体错认。VEGA-RAG 的研究问题是：\textbf{当两路证据冲突或实体 margin 过低时，系统能否主动追加检索或拒答，而不是把更多文本直接塞给生成模型？}
+\end{callout}
+
+\subsection{门控分数与动作}
+\[
+C=\alpha s_{image}+\beta s_{web}+\gamma A_{entity}-\delta D_{conflict}
+\]
+\begin{tabularx}{\textwidth}{>{\bfseries}p{28mm} p{40mm} X}
+\toprule
+置信区间 & 动作 & 可解释 trace \\
+\midrule
+$C \ge \tau_h$ & 直接回答 & 使用的 KG/WEB ID、分数、实体一致性 \\
+$\tau_l < C < \tau_h$ & 重写查询并扩大 K & 原查询、新查询、追加证据、延迟增量 \\
+$C \le \tau_l$ & 校准拒答 & 冲突实体、缺失事实、拒答原因 \\
+\bottomrule
+\end{tabularx}
+\clearpage
+
+% 9
+\section{三条可证伪假设，比“模型更聪明”更像研究}
+
+\begin{enumerate}
+  \item \textbf{实体一致性假设：} 以 image top-1/top-2 margin、KG 实体属性与 Web 实体共现构成门控，可降低实体错认样例占比。
+  \item \textbf{自适应检索假设：} 只在中置信样例扩大 K 或重写查询，能在 P95 延迟增加不超过 20\% 的条件下提升正确核心信息覆盖。
+  \item \textbf{拒答校准假设：} 对低置信或证据冲突样例拒答，可减少“错误但自信”的答案，并提高 truthfulness，而不是追求表面回答率。
+\end{enumerate}
+
+\begin{minipage}[t]{0.48\textwidth}
+\begin{greenbox}
+\textbf{A：研究亮点}\par
+证据一致性不只是相似度相加；门控动作本身可消融，可解释，可证伪。研究动机直接来自 11 个实体错认。
+\end{greenbox}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\begin{callout}
+\textbf{B：工程亮点}\par
+固定 manifest、惰性索引、图像预取、32 项测试、trace ID 和 GPU/延迟证据让每个结论能被重跑。
+\end{callout}
+\end{minipage}
+
+\begin{tcolorbox}[colback=PaleOrange,colframe=Orange!40,boxrule=.6pt,arc=2mm]
+\textbf{C：演示亮点}\par
+用“绿、黄、红”三张样例卡现场演示：绿卡 Fiat 奖项直接回答；黄卡 Sourdough 追加检索后补齐要点；红卡台湾博物馆实体冲突时拒答。每张卡同时显示实体、两路证据、gate 分数、动作和耗时。
+\end{tcolorbox}
+
+\subsection{研究依据}
+\small
+CRAG-MM 指出简单 RAG 在 truthfulness 上仍弱，并考虑图像质量、问题类型、实体流行度和信息动态性。Corrective RAG 支持“先评估检索质量，再决定纠正动作”；Self-RAG 支持自适应检索与显式反思。VEGA-RAG 将两者落到多模态实体一致性，而不是声称一个未经验证的新理论。
+\clearpage
+
+% 10
+\section{消融矩阵：同一清单、成对比较、先小后大}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{15mm} p{38mm} c c c X}
+\toprule
+编号 & 版本 & 一致性门控 & 自适应 K & 校准拒答 & 要回答的问题 \\
+\midrule
+B0 & 当前 Task 2 baseline & -- & -- & -- & 真实基线与错误谱 \\
+A1 & B0 + entity agreement & 有 & -- & -- & 实体错认是否下降 \\
+A2 & A1 + query rewrite & 有 & 有 & -- & 中置信样例是否受益 \\
+A3 & A1 + abstention & 有 & -- & 有 & truthfulness 是否改善 \\
+FULL & VEGA-RAG & 有 & 有 & 有 & 质量、延迟与拒答的整体取舍 \\
+\bottomrule
+\end{tabularx}
+
+\subsection{评测设计}
+\begin{itemize}
+  \item \textbf{配对样本：} 先复用本次 30 条做开发诊断；参数冻结后扩大到更多 validation，禁止只挑展示样例。
+  \item \textbf{质量指标：} 官方可用时报告 accuracy、missing、hallucination、truthfulness；同时报告双人复核一致率。
+  \item \textbf{检索指标：} 实体识别准确率、top-2 margin、evidence agreement、Web/KG 冲突率、Recall@K。
+  \item \textbf{系统指标：} run completion、P50/P95 latency、GPU 峰值显存、每样例 token 与证据数。
+  \item \textbf{统计呈现：} 对 30 条成对结果使用 bootstrap 置信区间或 McNemar 检验；小样本只报效应与区间，不只报单点提升。
+\end{itemize}
+
+\begin{callout}
+\textbf{双 A800 的正确实验方式。} GPU0 跑 B0，GPU1 同时跑 A1/A2；两边使用同 manifest 与 seed。这样老师看到的不只是“我租了两张卡”，而是“我把硬件变成可比较实验的吞吐工具”。
+\end{callout}
+\clearpage
+
+% 11
+\section{中期 PPT 审查：后三页应从“待云端”升级为“证据到研究”}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{17mm} p{52mm} X}
+\toprule
+原页 & 现有信息 & 建议替换 \\
+\midrule
+第 5 页 & 19 个测试、120 条合成 trace、30 条真实样本清单；明确暂无 benchmark & 改为“32 项远端测试、Task 2 30/30、173.01 秒、GPU 38,686 MiB、退出 0”，保留非官方指标警示 \\
+第 6 页 & Task 1/Task 2 仍标“待云端” & 改为三层证据：运行完成性、检索可用性、单人快速质量复核；用成功与失败各一例 \\
+第 7 页 & “可运行、可追溯、尚未达到性能验收”与云端 checklist & 改为“云端闭环已完成，质量验收刚开始”；引出 VEGA-RAG 与成对消融矩阵 \\
+\bottomrule
+\end{tabularx}
+
+\subsection{推荐的 7 页讲述顺序}
+\begin{enumerate}
+  \item 任务与 stakes：多模态问答最难的是“图像实体 + 动态事实 + 真实性”。
+  \item 三种任务模式：Vision、Image KG、Image KG + Web。
+  \item 工程底座：固定清单、trace、测试与真实索引。
+  \item 真实云端结果：30/30 与 GPU/耗时证据。
+  \item 质量诊断：7 正确、6 部分、17 不正确，实体错认 11。
+  \item 研究创新：VEGA-RAG 证据一致性门控。
+  \item 下一步：双 A800 成对消融与可视化 demo。
+\end{enumerate}
+
+\begin{riskbox}
+不要把 exact-match 0 隐藏，也不要把单人快速复核包装成官方 accuracy。最有说服力的表达是：\textbf{“我们已经有了能暴露错误的真实系统，因此可以提出可证伪的改进。”}
+\end{riskbox}
+\clearpage
+
+% 12
+\section{明天现场演示：90 秒内让老师看到研究闭环}
+
+\begin{enumerate}
+  \item \textbf{0-15 秒：} 打开正式运行摘要，指出 exit 0、30/30、同一 seed、GPU 峰值与真实日志路径。
+  \item \textbf{15-40 秒：} 打开 Fiat 500 成功 trace，依次高亮 KG4、WEB1 与最终 Compasso d'Oro 答案。
+  \item \textbf{40-65 秒：} 打开台湾博物馆失败 trace，展示图像实体与 Web 实体冲突；说明 baseline 没有 gate，所以错误继续进入生成。
+  \item \textbf{65-90 秒：} 切到 VEGA-RAG 三色门控图，说明下一周用同 30 条成对消融验证，而不是换样本讲故事。
+\end{enumerate}
+
+\begin{minipage}[t]{0.48\textwidth}
+\begin{greenbox}
+\textbf{现场必须准备}\par
+PDF 本地副本；成功与失败 trace 的静态截图；断网时可演示的 JSON；一页 GPU 曲线；正式命令与 exit 0。
+\end{greenbox}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\begin{riskbox}
+\textbf{不要现场冒险}\par
+不重新下载 21GB 模型；不临时跑完整 30 条；不把云服务器 SSH 当唯一入口；不承诺未完成的 A1/A2 提升。
+\end{riskbox}
+\end{minipage}
+
+\subsection{老师可能追问的三句话回答}
+\begin{itemize}
+  \item \textbf{为什么 exact-match 是 0？} 当前答案多为自然语言扩写，精确字符串匹配过严，同时确有实体和推理错误；所以我们分开报告完成性、人工诊断与未来官方语义分数。
+  \item \textbf{创新在哪里？} 不是再加一个搜索源，而是把图像实体、KG 与 Web 的一致性变成显式 gate，并让系统选择回答、追加检索或拒答。
+  \item \textbf{如何证明有效？} 同一 manifest 做 B0/A1/A2/A3/FULL 成对消融，报告质量、拒答校准、P95 延迟和显存，不只挑成功案例。
+\end{itemize}
+\clearpage
+
+% 13
+\section{下一周执行清单：从基线到可发表式实验}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{18mm} p{50mm} X}
+\toprule
+优先级 & 工作包 & 验收门槛 \\
+\midrule
+P0 & trace v3：记录 top-2 margin、entity agreement、batch 与 per-sample latency & 32 项测试不回归；30 条 trace 字段齐全 \\
+P0 & 双人复核本次 30 条，建立 correct/partial/incorrect 与根因标签 & 分歧样例有仲裁；报告一致率 \\
+P1 & 实现 A1 entity agreement gate & 同清单实体错认数相对 B0 下降 \\
+P1 & 实现 A2 query rewrite 与动态 K & P95 延迟增量受控；中置信样例覆盖改善 \\
+P1 & 实现 A3 calibrated abstention & 错误自信回答下降，拒答原因可追踪 \\
+P2 & 双 A800 并行成对实验与 demo viewer & 一键重放成功、冲突、拒答三类 trace \\
+\bottomrule
+\end{tabularx}
+
+\begin{callout}
+\textbf{决策门。} 如果 A1 在 30 条上不能明显减少实体错认，就不继续堆多轮 agent；先检查图像实体锚点、相似度 margin 与 KG 元数据质量。只有 A1 成立，才扩展到 A2/A3。
+\end{callout}
+
+\vfill
+\begin{center}
+{\fontsize{20}{28}\selectfont\bfseries\color{Navy}
+本周的关键进展不是“模型跑出了答案”，\\
+而是我们获得了可以复现、可以失败、也可以被改进的真实基线。}
+\end{center}
+\clearpage
+
+% Appendix A
+\section{附录 A：复现与验证命令}
+
+\subsection{图像预取}
+\begin{tcolorbox}[colback=Ink,colframe=Ink,arc=2mm]
+\color{white}\ttfamily\scriptsize
+python scripts/prefetch\_week2\_images.py \textbackslash\\
+\quad --dataset-path local\_data/.../validation-00004-of-00005.parquet \textbackslash\\
+\quad --manifest artifacts/week2/real\_task2\_30/sample\_manifest.json \textbackslash\\
+\quad --output artifacts/week2/real\_task2\_30/image\_prefetch.json
+\end{tcolorbox}
+
+\subsection{正式运行与一致性检查}
+\begin{tcolorbox}[colback=Ink,colframe=Ink,arc=2mm]
+\color{white}\ttfamily\scriptsize
+CUDA\_VISIBLE\_DEVICES=0 \textbackslash\\
+CRAG\_MODEL=/root/crag-task2-run/models/unsloth-Llama-3.2-11B-Vision-Instruct \textbackslash\\
+python scripts/week2\_experiment.py --mode task2 --backend vllm \textbackslash\\
+\quad --num-samples 30 --seed 20260712 --dataset-path local\_data/...parquet \textbackslash\\
+\quad --output-dir artifacts/week2/real\_task2\_30
+
+python -m unittest discover -s tests -v
+\end{tcolorbox}
+
+\subsection{验收结果}
+\begin{itemize}
+  \item 正式运行：\textbf{Exit status 0}；外层墙钟 3:14.88；run 内部 173.01 秒。
+  \item 最终远端测试：\textbf{32/32 OK}；pip check：\textbf{No broken requirements}。
+  \item 数据一致性：manifest 30 = trace 30 = all CSV 30 = score total 30；query 集合一致，CSV 输出排序不同。
+  \item 图像输入：cached 23 + embedded 7 = 30；failed 0。
+\end{itemize}
+\clearpage
+
+% Appendix B
+\section{附录 B：证据文件索引与来源}
+
+\begin{tabularx}{\textwidth}{>{\bfseries\raggedright\arraybackslash\scriptsize}p{52mm} X}
+\toprule
+文件 & 证明内容 \\
+\midrule
+\path{artifacts/week2/real_task2_30/run_config.json} & mode、backend、模型、seed、30 条索引、内部耗时 \\
+\path{.../agent_trace.jsonl} & 每条 query、Image KG/Web 证据、分数、答案、延迟、错误 \\
+\path{.../turn_evaluation_results_all.csv} & ground truth、最终回答与本地评测字段 \\
+\path{.../manual_review.csv} & 非官方单人快速复核标签与根因说明 \\
+\path{.../image_prefetch.json} & 23 条缓存、7 条内嵌、0 失败 \\
+\path{.../logs/task2-30.log} & vLLM 配置、权重/KV cache、正式输出、外层 time、Exit status 0 \\
+\path{.../logs/gpu-telemetry.csv} & 双 A800 的 5 秒采样温度、功耗、显存和利用率 \\
+\path{.../logs/remote-unit-tests-final.log} & 正式环境最终 32 项测试 OK \\
+\bottomrule
+\end{tabularx}
+
+\subsection{研究与软件来源}
+\small
+\begin{enumerate}
+  \item CRAG-MM: A Benchmark for Multimodal RAG. \href{https://arxiv.org/abs/2510.26160}{arXiv:2510.26160}.
+  \item Corrective Retrieval Augmented Generation. \href{https://arxiv.org/abs/2401.15884}{arXiv:2401.15884}.
+  \item Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection. \href{https://arxiv.org/abs/2310.11511}{arXiv:2310.11511}.
+  \item 实训仓库：\href{https://github.com/JoshuaZ16/intelligent-training-crag-mm}{JoshuaZ16/intelligent-training-crag-mm}.
+  \item 公开模型镜像：\href{https://huggingface.co/unsloth/Llama-3.2-11B-Vision-Instruct}{unsloth/Llama-3.2-11B-Vision-Instruct}.
+  \item 数据与检索索引：\href{https://huggingface.co/crag-mm-2025}{Hugging Face crag-mm-2025}，validation revision v0.1.2.
+\end{enumerate}
+
+\begin{riskbox}
+本报告未记录或暴露 SSH 密码、访问 token；所有性能与质量结论均以同步到本地的日志和结果为依据。
+\end{riskbox}
+
+\end{document}

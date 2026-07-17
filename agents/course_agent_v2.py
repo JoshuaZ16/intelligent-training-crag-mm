@@ -21,6 +21,11 @@ from typing import Any, Dict, Iterable, List, Protocol, Sequence
 
 from PIL import Image
 
+from agents.adaptive_retrieval import merge_web_results, rewrite_query
+from agents.calibrated_abstention import GateAction, choose_action
+from agents.entity_agreement import detect_numeric_conflict, score_and_rerank
+from agents.vega_config import ExperimentVariant, VegaThresholds
+
 try:
     from agents.base_agent import BaseAgent
 except ModuleNotFoundError:
@@ -61,6 +66,9 @@ class AgentConfig:
     max_answer_tokens: int = MAX_ANSWER_TOKENS
     web_score_threshold: float = 0.20
     trace_path: str | None = None
+    variant: ExperimentVariant = ExperimentVariant.B0
+    thresholds: VegaThresholds = field(default_factory=VegaThresholds)
+    adaptive_k: int = 5
 
     @classmethod
     def from_env(cls) -> "AgentConfig":
@@ -73,6 +81,17 @@ class AgentConfig:
             task_mode=mode,
             batch_size=int(os.getenv("CRAG_BATCH_SIZE", "4")),
             trace_path=os.getenv("CRAG_TRACE_PATH") or None,
+            variant=ExperimentVariant(
+                os.getenv(
+                    "CRAG_EXPERIMENT_VARIANT",
+                    ExperimentVariant.B0.value,
+                ).lower()
+            ),
+            thresholds=VegaThresholds(
+                tau_low=float(os.getenv("CRAG_TAU_LOW", "0.3")),
+                tau_high=float(os.getenv("CRAG_TAU_HIGH", "0.6")),
+            ),
+            adaptive_k=int(os.getenv("CRAG_ADAPTIVE_K", "5")),
         )
 
 
@@ -103,6 +122,25 @@ class TurnTrace:
     answer_token_count: int = 0
     status: str = "ok"
     errors: List[str] = field(default_factory=list)
+    trace_schema: str = "v3"
+    experiment_variant: str = ExperimentVariant.B0.value
+    entity_candidates: List[Dict[str, Any]] = field(default_factory=list)
+    entity_agreement_before: float = 0.0
+    entity_agreement: float = 0.0
+    entity_margin: float = 0.0
+    evidence_conflict: bool = False
+    gate_action: str = GateAction.ANSWER.value
+    additional_search_query: str = ""
+    additional_web_evidence: List[Dict[str, Any]] = field(default_factory=list)
+    additional_web_search_ms: float = 0.0
+    search_call_count: int = 0
+
+
+@dataclass
+class PreparedTurn:
+    prompt: str
+    trace: TurnTrace
+    forced_answer: str | None = None
 
 
 class GenerationBackend(Protocol):
@@ -386,6 +424,7 @@ class CourseRAGAgentV2(BaseAgent):
 
     def _search(self, value: Any, k: int, source: str, trace: TurnTrace) -> List[Dict[str, Any]]:
         started = time.perf_counter()
+        trace.search_call_count += 1
         try:
             if self.search_pipeline is None:
                 raise RuntimeError("search pipeline is not configured")
@@ -400,6 +439,8 @@ class CourseRAGAgentV2(BaseAgent):
             elapsed = (time.perf_counter() - started) * 1000
             if source == "image":
                 trace.image_search_ms = elapsed
+            elif source == "web_extra":
+                trace.additional_web_search_ms += elapsed
             else:
                 trace.web_search_ms = elapsed
 
@@ -415,11 +456,16 @@ class CourseRAGAgentV2(BaseAgent):
         self,
         query: str,
         image: Image.Image,
-    ) -> tuple[str, TurnTrace]:
-        trace = TurnTrace(agent_version=self.VERSION, task_mode=self.config.task_mode.value, query=query)
+    ) -> PreparedTurn:
+        trace = TurnTrace(
+            agent_version=self.VERSION,
+            task_mode=self.config.task_mode.value,
+            query=query,
+            experiment_variant=self.config.variant.value,
+        )
         if self.config.task_mode is TaskMode.VISION:
             prompt = build_prompt(query, self.config.task_mode, [], [], self.config.max_evidence_chars)
-            return prompt, trace
+            return PreparedTurn(prompt=prompt, trace=trace)
 
         raw_image = self._search(image, self.config.image_results, "image", trace)
         image_evidence = parse_image_evidence(
@@ -438,16 +484,97 @@ class CourseRAGAgentV2(BaseAgent):
                 max_items=self.config.web_results,
                 score_threshold=self.config.web_score_threshold,
             )
-        trace.image_evidence = [asdict(item) for item in image_evidence]
+
+        prompt_image_evidence = image_evidence
+        forced_answer = None
+        if self.config.task_mode is TaskMode.TASK2:
+            agreement = score_and_rerank(image_evidence, web_evidence, query)
+            conflict = detect_numeric_conflict(
+                [item.text for item in image_evidence],
+                [item.text for item in web_evidence],
+                query,
+            )
+            trace.entity_candidates = agreement.candidate_scores
+            trace.entity_agreement_before = agreement.top_score
+            trace.entity_agreement = agreement.top_score
+            trace.entity_margin = agreement.margin
+            trace.evidence_conflict = conflict
+            action = choose_action(
+                self.config.variant,
+                agreement.top_score,
+                conflict,
+                self.config.thresholds,
+            )
+            trace.gate_action = action.value
+
+            if self.config.variant is not ExperimentVariant.B0:
+                prompt_image_evidence = agreement.items
+
+            if action is GateAction.EXPAND and agreement.candidate_scores:
+                entity_name = str(
+                    agreement.candidate_scores[0]["entity_name"]
+                )
+                trace.additional_search_query = rewrite_query(
+                    entity_name,
+                    query,
+                )
+                raw_additional_web = self._search(
+                    trace.additional_search_query,
+                    self.config.adaptive_k,
+                    "web_extra",
+                    trace,
+                )
+                additional_web = parse_web_evidence(
+                    raw_additional_web,
+                    query,
+                    max_items=self.config.adaptive_k,
+                    score_threshold=self.config.web_score_threshold,
+                )
+                trace.additional_web_evidence = [
+                    asdict(item) for item in additional_web
+                ]
+                web_evidence = merge_web_results(
+                    web_evidence,
+                    additional_web,
+                )
+                agreement = score_and_rerank(
+                    image_evidence,
+                    web_evidence,
+                    query,
+                )
+                prompt_image_evidence = agreement.items
+                trace.entity_candidates = agreement.candidate_scores
+                trace.entity_agreement = agreement.top_score
+                trace.entity_margin = agreement.margin
+
+            if action is GateAction.ABSTAIN:
+                forced_answer = IDK_RESPONSE
+                trace.refusal_reason = (
+                    RefusalReason.CONFLICTING_EVIDENCE.value
+                    if conflict
+                    else RefusalReason.INSUFFICIENT_EVIDENCE.value
+                )
+
+        trace.image_evidence = [
+            asdict(item) for item in prompt_image_evidence
+        ]
         trace.web_evidence = [asdict(item) for item in web_evidence]
-        trace.selected_evidence_ids = [item.evidence_id for item in [*image_evidence, *web_evidence]]
-        return build_prompt(
+        trace.selected_evidence_ids = [
+            item.evidence_id
+            for item in [*prompt_image_evidence, *web_evidence]
+        ]
+        prompt = build_prompt(
             query,
             self.config.task_mode,
-            image_evidence,
+            prompt_image_evidence,
             web_evidence,
             self.config.max_evidence_chars,
-        ), trace
+        )
+        return PreparedTurn(
+            prompt=prompt,
+            trace=trace,
+            forced_answer=forced_answer,
+        )
 
     def batch_generate_response(
         self,
@@ -462,37 +589,69 @@ class CourseRAGAgentV2(BaseAgent):
 
         started = time.perf_counter()
         prepared = [self._prepare_turn(query, image) for query, image in zip(queries, images)]
-        prompts = [item[0] for item in prepared]
-        traces = [item[1] for item in prepared]
+        traces = [item.trace for item in prepared]
+        active_indices = [
+            index
+            for index, item in enumerate(prepared)
+            if item.forced_answer is None
+        ]
+        raw_answers = [
+            item.forced_answer or IDK_RESPONSE for item in prepared
+        ]
         generation_started = time.perf_counter()
-        try:
-            raw_answers = self.backend.answer_batch(prompts, images)
-        except Exception as exc:
-            raw_answers = [IDK_RESPONSE] * len(queries)
-            for trace in traces:
-                trace.status = "generation_error"
-                trace.errors.append(f"generation failed: {type(exc).__name__}: {exc}")
+        if active_indices:
+            active_prompts = [prepared[index].prompt for index in active_indices]
+            active_images = [images[index] for index in active_indices]
+            try:
+                generated = self.backend.answer_batch(
+                    active_prompts,
+                    active_images,
+                )
+            except Exception as exc:
+                generated = [IDK_RESPONSE] * len(active_indices)
+                for index in active_indices:
+                    traces[index].status = "generation_error"
+                    traces[index].errors.append(
+                        f"generation failed: {type(exc).__name__}: {exc}"
+                    )
+            if len(generated) != len(active_indices):
+                raise RuntimeError(
+                    f"backend returned {len(generated)} answers for "
+                    f"{len(active_indices)} active queries"
+                )
+            for index, answer in zip(active_indices, generated):
+                raw_answers[index] = answer
         generation_ms = (time.perf_counter() - generation_started) * 1000
-        if len(raw_answers) != len(queries):
-            raise RuntimeError(f"backend returned {len(raw_answers)} answers for {len(queries)} queries")
 
         answers: List[str] = []
-        per_turn_generation = generation_ms / max(len(queries), 1)
+        per_turn_generation = generation_ms / max(len(active_indices), 1)
         per_turn_total = (time.perf_counter() - started) * 1000 / max(len(queries), 1)
-        for raw_answer, trace in zip(raw_answers, traces):
+        for index, (raw_answer, trace) in enumerate(zip(raw_answers, traces)):
             answer, refusal = normalize_answer(raw_answer)
-            answer = self.backend.truncate(answer, self.config.max_answer_tokens) or IDK_RESPONSE
+            truncated = (
+                self.backend.truncate(
+                    answer,
+                    self.config.max_answer_tokens,
+                )
+                or IDK_RESPONSE
+            )
+            answer, truncated_refusal = normalize_answer(truncated)
+            refusal = refusal or truncated_refusal
             trace.answer = answer
             if answer == IDK_RESPONSE:
                 if trace.status == "generation_error":
                     trace.refusal_reason = "generation_error"
                 elif trace.errors:
                     trace.refusal_reason = RefusalReason.SEARCH_ERROR.value
+                elif trace.refusal_reason:
+                    pass
                 elif not trace.image_evidence and not trace.web_evidence and self.config.task_mode is not TaskMode.VISION:
                     trace.refusal_reason = RefusalReason.NO_RETRIEVAL.value
                 else:
                     trace.refusal_reason = (refusal or RefusalReason.INSUFFICIENT_EVIDENCE).value
-            trace.generation_ms = per_turn_generation
+            trace.generation_ms = (
+                per_turn_generation if index in active_indices else 0.0
+            )
             trace.total_ms = per_turn_total
             trace.answer_token_count = self.backend.count_tokens(answer)
             self._write_trace(trace)

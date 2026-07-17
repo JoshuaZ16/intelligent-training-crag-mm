@@ -19,6 +19,13 @@ local_data/
 # Generated evaluation, rendering, and temporary outputs
 artifacts/
 *.inspect.ndjson
+tmp/
+output/pdf/*.aux
+output/pdf/*.fdb_latexmk
+output/pdf/*.fls
+output/pdf/*.log
+output/pdf/*.out
+output/pdf/*.xdv
 
 # Tool and operating-system metadata
 .DS_Store

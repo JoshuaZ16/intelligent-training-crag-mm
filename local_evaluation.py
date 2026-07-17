@@ -27,6 +27,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from agents.base_agent import BaseAgent
+from agents.tokenizer_compat import load_evaluator_tokenizer
 from agents.user_config import UserAgent
 from crag_batch_iterator import CRAGTurnBatchIterator
 from cragmm_search.search import UnifiedSearchPipeline
@@ -86,7 +87,7 @@ class CRAGEvaluator:
         self.all_turn_data: list[dict[str, any]] = []
         self.session_ids_evaluated: set[str] = set()
         
-        self.tokenizer = Tokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
+        self.tokenizer = load_evaluator_tokenizer(Tokenizer)
         self.tokenizer.enable_truncation(max_length=MAX_RESPONSE_LENGTH_IN_TOKENS)
 
 
