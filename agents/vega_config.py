@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from agents.turnvega_config import TurnVegaVariant
+
 
 class ExperimentVariant(str, Enum):
     B0 = "b0"
@@ -15,6 +17,16 @@ class ExperimentVariant(str, Enum):
     A3 = "a3"
     FULL = "full"
     A2_ENRICH_ALL = "a2_enrich_all"
+
+
+def normalize_variant(value: str) -> str:
+    supported_values = {
+        item.value for enum_type in (ExperimentVariant, TurnVegaVariant)
+        for item in enum_type
+    }
+    if value in supported_values:
+        return value
+    raise ValueError(f"unsupported experiment variant: {value}")
 
 
 @dataclass(frozen=True)

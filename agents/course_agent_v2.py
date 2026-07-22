@@ -17,13 +17,14 @@ import time
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Protocol, Sequence
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Protocol, Sequence
 
 from PIL import Image
 
 from agents.adaptive_retrieval import merge_web_results, rewrite_query
 from agents.calibrated_abstention import GateAction, choose_action
 from agents.entity_agreement import detect_numeric_conflict, score_and_rerank
+from agents.turnvega_config import TurnVegaVariant
 from agents.vega_config import ExperimentVariant, VegaThresholds
 
 try:
@@ -66,9 +67,18 @@ class AgentConfig:
     max_answer_tokens: int = MAX_ANSWER_TOKENS
     web_score_threshold: float = 0.20
     trace_path: str | None = None
-    variant: ExperimentVariant = ExperimentVariant.B0
+    variant: ExperimentVariant | TurnVegaVariant = ExperimentVariant.B0
     thresholds: VegaThresholds = field(default_factory=VegaThresholds)
     adaptive_k: int = 5
+    dataset_kind: str = ""
+    trace_schema: str = "v3"
+    history_mode: str = ""
+    candidate_passages: int | None = None
+    prompt_evidence: int | None = None
+    max_search_calls: int | None = None
+    run_id: str = ""
+    seed: int = 20260720
+    temperature: float = 0.0
 
     @classmethod
     def from_env(cls) -> "AgentConfig":
@@ -77,21 +87,32 @@ class AgentConfig:
             mode = TaskMode(raw_mode)
         except ValueError as exc:
             raise ValueError(f"Unsupported CRAG_TASK_MODE={raw_mode!r}") from exc
+        raw_variant = os.getenv(
+            "CRAG_EXPERIMENT_VARIANT",
+            ExperimentVariant.B0.value,
+        ).lower()
+        try:
+            variant: ExperimentVariant | TurnVegaVariant = ExperimentVariant(
+                raw_variant
+            )
+        except ValueError:
+            variant = TurnVegaVariant(raw_variant)
         return cls(
             task_mode=mode,
             batch_size=int(os.getenv("CRAG_BATCH_SIZE", "4")),
             trace_path=os.getenv("CRAG_TRACE_PATH") or None,
-            variant=ExperimentVariant(
-                os.getenv(
-                    "CRAG_EXPERIMENT_VARIANT",
-                    ExperimentVariant.B0.value,
-                ).lower()
-            ),
+            variant=variant,
             thresholds=VegaThresholds(
                 tau_low=float(os.getenv("CRAG_TAU_LOW", "0.3")),
                 tau_high=float(os.getenv("CRAG_TAU_HIGH", "0.6")),
             ),
             adaptive_k=int(os.getenv("CRAG_ADAPTIVE_K", "5")),
+            dataset_kind=os.getenv("CRAG_DATASET_KIND", ""),
+            trace_schema=os.getenv("CRAG_TRACE_SCHEMA", "v3"),
+            history_mode=os.getenv("CRAG_HISTORY_MODE", ""),
+            run_id=os.getenv("CRAG_RUN_ID", ""),
+            seed=int(os.getenv("CRAG_SEED", "20260720")),
+            temperature=float(os.getenv("CRAG_TEMPERATURE", "0")),
         )
 
 
@@ -134,6 +155,36 @@ class TurnTrace:
     additional_web_evidence: List[Dict[str, Any]] = field(default_factory=list)
     additional_web_search_ms: float = 0.0
     search_call_count: int = 0
+    run_id: str = ""
+    interaction_id: str = ""
+    dataset_kind: str = ""
+    session_key: str = ""
+    turn_index: int = 0
+    history_mode: str = ""
+    question_frame: Dict[str, Any] = field(default_factory=dict)
+    image_needed: bool = False
+    history_needed: bool = False
+    web_needed: bool = False
+    entity_candidates_before: List[Dict[str, Any]] = field(default_factory=list)
+    entity_candidates_after: List[Dict[str, Any]] = field(default_factory=list)
+    candidate_queries: List[str] = field(default_factory=list)
+    query_family: str = ""
+    candidate_budget: int = 0
+    atomic_evidence: List[Dict[str, Any]] = field(default_factory=list)
+    source_clusters: List[Dict[str, Any]] = field(default_factory=list)
+    relation_coverage: Dict[str, Any] = field(default_factory=dict)
+    circularity_flags: List[str] = field(default_factory=list)
+    answerability_scores: Dict[str, Any] = field(default_factory=dict)
+    typed_conflicts: List[Dict[str, Any]] = field(default_factory=list)
+    evidence_packet: Dict[str, Any] = field(default_factory=dict)
+    evidence_packet_sha256: str = ""
+    evidence_token_count: int = 0
+    memory_state_before: Dict[str, Any] = field(default_factory=dict)
+    memory_state_after: Dict[str, Any] = field(default_factory=dict)
+    provisional_claims: List[Dict[str, Any]] = field(default_factory=list)
+    verified_claims: List[Dict[str, Any]] = field(default_factory=list)
+    quarantined_claims: List[Dict[str, Any]] = field(default_factory=list)
+    state_version: int = 0
 
 
 @dataclass
@@ -319,12 +370,20 @@ def normalize_answer(text: str) -> tuple[str, RefusalReason | None]:
 
 
 class VllmBackend:
-    def __init__(self, model_name: str = DEFAULT_MODEL):
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL,
+        seed: int = 20260720,
+        temperature: float = 0.0,
+    ):
         import vllm
 
         self.vllm = vllm
+        self.seed = seed
+        self.temperature = temperature
         self.llm = vllm.LLM(
             model_name,
+            seed=seed,
             tensor_parallel_size=1,
             gpu_memory_utilization=0.85,
             max_model_len=8192,
@@ -346,7 +405,11 @@ class VllmBackend:
             inputs.append({"prompt": formatted, "multi_modal_data": {"image": image}})
         outputs = self.llm.generate(
             inputs,
-            sampling_params=self.vllm.SamplingParams(temperature=0.0, max_tokens=MAX_ANSWER_TOKENS),
+            sampling_params=self.vllm.SamplingParams(
+                temperature=self.temperature,
+                max_tokens=MAX_ANSWER_TOKENS,
+                seed=self.seed,
+            ),
         )
         return [output.outputs[0].text for output in outputs]
 
@@ -395,12 +458,16 @@ class MlxVlmBackend:
         return len(self.tokenizer.encode(text))
 
 
-def create_backend() -> GenerationBackend:
+def create_backend(config: AgentConfig | None = None) -> GenerationBackend:
     backend_name = os.getenv("CRAG_BACKEND", "mlx" if platform.system() == "Darwin" else "vllm").lower()
     if backend_name == "mlx":
         return MlxVlmBackend(os.getenv("CRAG_MODEL", DEFAULT_MLX_MODEL))
     if backend_name == "vllm":
-        return VllmBackend(os.getenv("CRAG_MODEL", DEFAULT_MODEL))
+        return VllmBackend(
+            os.getenv("CRAG_MODEL", DEFAULT_MODEL),
+            seed=config.seed if config else 20260720,
+            temperature=config.temperature if config else 0.0,
+        )
     raise ValueError(f"Unsupported CRAG_BACKEND={backend_name!r}")
 
 
@@ -414,16 +481,30 @@ class CourseRAGAgentV2(BaseAgent):
         backend: GenerationBackend | None = None,
         config: AgentConfig | None = None,
         load_backend: bool = True,
+        trace_identity_provider: Callable[
+            [str, Image.Image, Sequence[Dict[str, Any]]],
+            Mapping[str, Any],
+        ] | None = None,
     ):
         super().__init__(search_pipeline)
         self.config = config or AgentConfig.from_env()
         self.backend = backend if backend is not None else (create_backend() if load_backend else None)
+        self.trace_identity_provider = trace_identity_provider
 
     def get_batch_size(self) -> int:
         return self.config.batch_size
 
     def _search(self, value: Any, k: int, source: str, trace: TurnTrace) -> List[Dict[str, Any]]:
         started = time.perf_counter()
+        if (
+            self.config.max_search_calls is not None
+            and trace.search_call_count >= self.config.max_search_calls
+        ):
+            trace.errors.append(
+                "search call budget exhausted before " + source
+            )
+            trace.status = "search_budget_exhausted"
+            return []
         trace.search_call_count += 1
         try:
             if self.search_pipeline is None:
@@ -456,12 +537,41 @@ class CourseRAGAgentV2(BaseAgent):
         self,
         query: str,
         image: Image.Image,
+        message_history: Sequence[Dict[str, Any]] = (),
     ) -> PreparedTurn:
+        trace_identity: Mapping[str, Any] = {}
+        if self.trace_identity_provider is not None:
+            take = getattr(self.trace_identity_provider, "take", None)
+            if callable(take):
+                trace_identity = take(query, message_history)
+            else:
+                trace_identity = self.trace_identity_provider(
+                    query,
+                    image,
+                    message_history,
+                )
+            if not isinstance(trace_identity, Mapping):
+                raise TypeError("trace_identity_provider must return a mapping")
+        turn_index = trace_identity.get("turn_index", 0)
+        if type(turn_index) is not int:
+            raise ValueError("trace turn_index must be an integer")
         trace = TurnTrace(
             agent_version=self.VERSION,
             task_mode=self.config.task_mode.value,
             query=query,
+            trace_schema=self.config.trace_schema,
             experiment_variant=self.config.variant.value,
+            run_id=self.config.run_id,
+            interaction_id=str(trace_identity.get("interaction_id") or ""),
+            dataset_kind=self.config.dataset_kind,
+            session_key=str(
+                trace_identity.get("session_key")
+                or trace_identity.get("session_id")
+                or ""
+            ),
+            turn_index=turn_index,
+            history_mode=self.config.history_mode,
+            candidate_budget=self.config.candidate_passages or 0,
         )
         if self.config.task_mode is TaskMode.VISION:
             prompt = build_prompt(query, self.config.task_mode, [], [], self.config.max_evidence_chars)
@@ -477,17 +587,31 @@ class CourseRAGAgentV2(BaseAgent):
         web_evidence: List[EvidenceItem] = []
         if self.config.task_mode is TaskMode.TASK2:
             trace.search_query = build_search_query(query, image_evidence)
-            raw_web = self._search(trace.search_query, self.config.web_results, "web", trace)
+            candidate_passages = (
+                self.config.candidate_passages or self.config.web_results
+            )
+            prompt_evidence = (
+                self.config.prompt_evidence or self.config.web_results
+            )
+            raw_web = self._search(
+                trace.search_query,
+                candidate_passages,
+                "web",
+                trace,
+            )
             web_evidence = parse_web_evidence(
                 raw_web,
                 query,
-                max_items=self.config.web_results,
+                max_items=prompt_evidence,
                 score_threshold=self.config.web_score_threshold,
             )
 
         prompt_image_evidence = image_evidence
         forced_answer = None
-        if self.config.task_mode is TaskMode.TASK2:
+        if (
+            self.config.task_mode is TaskMode.TASK2
+            and isinstance(self.config.variant, ExperimentVariant)
+        ):
             agreement = score_and_rerank(image_evidence, web_evidence, query)
             conflict = detect_numeric_conflict(
                 [item.text for item in image_evidence],
@@ -588,7 +712,14 @@ class CourseRAGAgentV2(BaseAgent):
             raise RuntimeError("generation backend is not loaded")
 
         started = time.perf_counter()
-        prepared = [self._prepare_turn(query, image) for query, image in zip(queries, images)]
+        prepared = [
+            self._prepare_turn(query, image, message_history)
+            for query, image, message_history in zip(
+                queries,
+                images,
+                message_histories,
+            )
+        ]
         traces = [item.trace for item in prepared]
         active_indices = [
             index

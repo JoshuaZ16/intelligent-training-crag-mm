@@ -1,7 +1,10 @@
 import json
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from PIL import Image
 
@@ -10,7 +13,10 @@ from agents.course_agent_v2 import (
     CourseRAGAgentV2,
     EvidenceItem,
     IDK_RESPONSE,
+    PreparedTurn,
     TaskMode,
+    TurnTrace,
+    VllmBackend,
     build_prompt,
     build_search_query,
     clean_markup,
@@ -18,6 +24,7 @@ from agents.course_agent_v2 import (
     parse_image_evidence,
     parse_web_evidence,
 )
+from agents.turnvega_config import TurnVegaVariant
 
 
 class FakeBackend:
@@ -171,6 +178,155 @@ class CourseAgentCoreTest(unittest.TestCase):
         agent = CourseRAGAgentV2(FakeSearch(), FakeBackend(["only one"]), AgentConfig(task_mode=TaskMode.VISION))
         with self.assertRaises(RuntimeError):
             agent.batch_generate_response(["q1", "q2"], [self.image, self.image], [[], []])
+
+    def test_v5_trace_serializes_every_protocol_field_for_b0(self):
+        v5_fields = {
+            "trace_schema",
+            "experiment_variant",
+            "run_id",
+            "interaction_id",
+            "dataset_kind",
+            "session_key",
+            "turn_index",
+            "history_mode",
+            "question_frame",
+            "image_needed",
+            "history_needed",
+            "web_needed",
+            "entity_candidates_before",
+            "entity_candidates_after",
+            "candidate_queries",
+            "query_family",
+            "candidate_budget",
+            "atomic_evidence",
+            "source_clusters",
+            "relation_coverage",
+            "circularity_flags",
+            "answerability_scores",
+            "typed_conflicts",
+            "evidence_packet",
+            "evidence_packet_sha256",
+            "evidence_token_count",
+            "memory_state_before",
+            "memory_state_after",
+            "provisional_claims",
+            "verified_claims",
+            "quarantined_claims",
+            "state_version",
+        }
+        self.assertEqual(len(v5_fields), 32)
+        with tempfile.TemporaryDirectory() as tmp:
+            trace_path = Path(tmp) / "agent_trace_v5.jsonl"
+            agent = CourseRAGAgentV2(
+                FakeSearch(),
+                FakeBackend(),
+                AgentConfig(
+                    task_mode=TaskMode.TASK2,
+                    dataset_kind="task2",
+                    trace_schema="v5",
+                    run_id="run-v5-test",
+                    trace_path=str(trace_path),
+                    variant=TurnVegaVariant.T2_B0,
+                ),
+                trace_identity_provider=lambda query, image, history: {
+                    "interaction_id": "interaction-v5-test",
+                },
+            )
+            agent.batch_generate_response(["Who designed it?"], [self.image], [[]])
+            trace = json.loads(trace_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(v5_fields.issubset(trace))
+        self.assertEqual(trace["trace_schema"], "v5")
+        self.assertEqual(trace["dataset_kind"], "task2")
+        self.assertEqual(trace["experiment_variant"], "t2_b0")
+        self.assertEqual(trace["run_id"], "run-v5-test")
+        self.assertEqual(trace["interaction_id"], "interaction-v5-test")
+
+    def test_batch_forwards_each_corresponding_message_history(self):
+        class HistorySpyAgent(CourseRAGAgentV2):
+            def __init__(self):
+                super().__init__(
+                    FakeSearch(),
+                    FakeBackend(["one", "two"]),
+                    AgentConfig(task_mode=TaskMode.VISION),
+                )
+                self.seen_histories = []
+
+            def _prepare_turn(self, query, image, message_history=()):
+                self.seen_histories.append(message_history)
+                return PreparedTurn(
+                    prompt=query,
+                    trace=TurnTrace(
+                        agent_version=self.VERSION,
+                        task_mode=self.config.task_mode.value,
+                        query=query,
+                    ),
+                )
+
+        histories = [
+            [{"role": "user", "content": "first"}],
+            [{"role": "assistant", "content": "second"}],
+        ]
+        agent = HistorySpyAgent()
+        agent.batch_generate_response(
+            ["q1", "q2"],
+            [self.image, self.image],
+            histories,
+        )
+        self.assertEqual(agent.seen_histories, histories)
+
+    def test_empty_history_t2_b0_keeps_legacy_prompt_and_search_sequence(self):
+        legacy_search = FakeSearch()
+        turnvega_search = FakeSearch()
+        legacy_backend = FakeBackend()
+        turnvega_backend = FakeBackend()
+        legacy = CourseRAGAgentV2(
+            legacy_search,
+            legacy_backend,
+            AgentConfig(task_mode=TaskMode.TASK2),
+        )
+        turnvega = CourseRAGAgentV2(
+            turnvega_search,
+            turnvega_backend,
+            AgentConfig(
+                task_mode=TaskMode.TASK2,
+                dataset_kind="task2",
+                trace_schema="v5",
+                variant=TurnVegaVariant.T2_B0,
+            ),
+        )
+
+        legacy_answer = legacy.batch_generate_response(
+            ["Who designed it?"], [self.image], [[]]
+        )
+        turnvega_answer = turnvega.batch_generate_response(
+            ["Who designed it?"], [self.image], [[]]
+        )
+
+        self.assertEqual(turnvega_answer, legacy_answer)
+        self.assertEqual(turnvega_backend.prompts, legacy_backend.prompts)
+        self.assertEqual(
+            [call[0] for call in turnvega_search.calls],
+            [call[0] for call in legacy_search.calls],
+        )
+
+    def test_vllm_backend_receives_seed_and_zero_temperature(self):
+        fake_vllm = types.ModuleType("vllm")
+
+        class FakeLlm:
+            def get_tokenizer(self):
+                return object()
+
+        fake_vllm.LLM = mock.Mock(return_value=FakeLlm())
+        with mock.patch.dict(sys.modules, {"vllm": fake_vllm}):
+            backend = VllmBackend(
+                "org/model",
+                seed=1234,
+                temperature=0.0,
+            )
+        self.assertEqual(backend.seed, 1234)
+        self.assertEqual(backend.temperature, 0.0)
+        self.assertEqual(fake_vllm.LLM.call_args.kwargs["seed"], 1234)
 
 
 if __name__ == "__main__":
