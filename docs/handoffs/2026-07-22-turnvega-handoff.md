@@ -183,3 +183,19 @@ Task 3 另报告总 turn 数、EPC、Recovery@1、History Harm、会话全正确
 - 不得解除 support gate 后复用同一逻辑制造伪对比。
 - 不得按结果重选 main40 或用 exact match 替代人工 C/P/I/M 盲审。
 - 不得在仓库、日志或交接文档中提交密钥、密码或私钥。
+
+## 9. 2026-07-24 新实例续跑补充
+
+- 旧 `legacy30` 清单来自
+  `validation-00004-of-00005.parquet`，其中的 `source_index` 是该分片内
+  的局部下标，不是完整 validation 的全局下标。例如旧清单的第一个
+  `source_index=69` 在完整 validation 中对应 `source_index=1620`。
+- 构建新划分时必须使用 `session_id` 排除旧样本；不得用旧清单中的裸
+  `source_index` 同时过滤完整 Task 2 或 Task 3 数据集。
+- 新实例的无卡模式 cgroup 内存上限只有 2 GiB。清单构建只投影
+  `session_id` 和 `turns` 字段，避免解码图片列造成 OOM。
+- 冻结索引必须使用交接中记录的 revision，CLIP/BGE 和两个 Chroma
+  索引均从已校验的本地快照加载；正式运行启用离线模式。
+- 实验状态在结果落盘后先写为 `results_saved`，显式停止 vLLM 和
+  Chroma 资源并完成回收后才写为 `completed`。若清理卡住，外层
+  watchdog 可以区分“结果已保存但子进程未正常退出”和真正完成。

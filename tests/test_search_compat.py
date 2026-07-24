@@ -1,9 +1,14 @@
+import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 
 from agents.search_compat import (
     LazyCollectionMetadata,
     LazyImageMetadata,
+    close_search_pipeline,
     load_collection_metadata_paged,
+    resolve_dataset_snapshot,
 )
 
 
@@ -36,6 +41,44 @@ class FakeCollection:
 
 
 class SearchCompatibilityTest(unittest.TestCase):
+    def test_local_dataset_snapshot_is_resolved_without_hub_access(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(
+                resolve_dataset_snapshot(tmp, "ignored-revision"),
+                str(Path(tmp).resolve()),
+            )
+
+    def test_pipeline_cleanup_stops_each_owned_chroma_system_once(self):
+        class FakeSystem:
+            def __init__(self):
+                self.stop_count = 0
+
+            def stop(self):
+                self.stop_count += 1
+
+        image_system = FakeSystem()
+        web_system = FakeSystem()
+        pipeline = SimpleNamespace(
+            crag_image_kg=SimpleNamespace(
+                _chroma_client=SimpleNamespace(_system=image_system)
+            ),
+            text_web=SimpleNamespace(
+                _chroma_client=SimpleNamespace(_system=web_system)
+            ),
+            image_collection=object(),
+            image_model=object(),
+            image_processor=object(),
+            text_model=object(),
+            text_tokenizer=object(),
+        )
+
+        self.assertEqual(close_search_pipeline(pipeline), [])
+        self.assertEqual(close_search_pipeline(pipeline), [])
+        self.assertEqual(image_system.stop_count, 1)
+        self.assertEqual(web_system.stop_count, 1)
+        self.assertIsNone(pipeline.image_model)
+        self.assertIsNone(pipeline.text_model)
+
     def test_metadata_is_loaded_in_bounded_pages(self):
         collection = FakeCollection()
 

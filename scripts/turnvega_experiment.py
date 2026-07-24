@@ -842,6 +842,8 @@ def run_experiment(args: argparse.Namespace) -> Dict[str, Any]:
         run_config["completed_at_utc"] = datetime.now(timezone.utc).isoformat()
         _write_run_config(output_dir, run_config)
         return run_config
+    agent = None
+    cleanup_errors: List[str] = []
     try:
         from datasets import load_dataset
         from local_evaluation import CRAGEvaluator
@@ -884,6 +886,11 @@ def run_experiment(args: argparse.Namespace) -> Dict[str, Any]:
         )
         turn_results, scores = evaluator.evaluate_agent()
         evaluator.save_results(turn_results, scores, str(output_dir))
+        run_config["status"] = "results_saved"
+        run_config["results_saved_at_utc"] = datetime.now(
+            timezone.utc
+        ).isoformat()
+        _write_run_config(output_dir, run_config)
     except Exception as exc:
         run_config.update(
             status="failed",
@@ -893,6 +900,17 @@ def run_experiment(args: argparse.Namespace) -> Dict[str, Any]:
         )
         _write_run_config(output_dir, run_config)
         raise
+    finally:
+        if agent is not None:
+            run_config["cleanup_started_at_utc"] = datetime.now(
+                timezone.utc
+            ).isoformat()
+            cleanup_errors = agent.close()
+            run_config["cleanup_errors"] = cleanup_errors
+            run_config["cleanup_completed_at_utc"] = datetime.now(
+                timezone.utc
+            ).isoformat()
+            _write_run_config(output_dir, run_config)
 
     run_config["status"] = "completed"
     run_config["completed_at_utc"] = datetime.now(timezone.utc).isoformat()

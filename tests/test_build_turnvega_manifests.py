@@ -162,7 +162,6 @@ class BuildTurnVegaManifestsTest(unittest.TestCase):
             manifests["t3_test60.json"][-40:],
         )
 
-        legacy_sources = {row["source_index"] for row in self.legacy_rows}
         legacy_sessions = {row["session_id"] for row in self.legacy_rows}
         required = {
             "source_index",
@@ -181,7 +180,6 @@ class BuildTurnVegaManifestsTest(unittest.TestCase):
                 for row in rows:
                     self.assertTrue(required.issubset(row))
                     self.assertIs(type(row["source_index"]), int)
-                    self.assertNotIn(row["source_index"], legacy_sources)
                     self.assertNotIn(row["session_id"], legacy_sessions)
                     if task == "t3":
                         self.assertIn("turn_count", row)
@@ -207,10 +205,13 @@ class BuildTurnVegaManifestsTest(unittest.TestCase):
             for name in ("t3_cal20.json", "t3_dev40.json", "t3_test60.json")
             for row in manifests[name]
         }
+        sources_by_session = {
+            row["session_id"]: row for row in self.multi_rows
+        }
 
         self.assertEqual(len(selected), 120)
-        for source in self.multi_rows[30:]:
-            row = selected[source["session_id"]]
+        for session_id, row in selected.items():
+            source = sources_by_session[session_id]
             turns = source["turns"]
             expected_count = (
                 len(turns["query"]) if isinstance(turns, dict) else len(turns)
@@ -325,6 +326,10 @@ class BuildTurnVegaManifestsTest(unittest.TestCase):
             self.assertEqual(
                 first_summary["source_index_namespace"],
                 "dataset-local; cross-task source indices are not compared",
+            )
+            self.assertEqual(
+                first_summary["legacy_exclusion_identity"],
+                "session_id",
             )
             for task in ("t2", "t3"):
                 derived = first_summary["derived_main40"][f"{task}_main40.json"]
@@ -475,6 +480,39 @@ class BuildTurnVegaManifestsTest(unittest.TestCase):
                         make_multi_rows(120),
                         legacy_rows,
                     )
+
+    def test_legacy_shard_indices_do_not_exclude_unrelated_full_rows(self):
+        single_rows = make_single_rows(241)
+        multi_rows = make_multi_rows(121)
+        for index, row in enumerate(multi_rows):
+            row["source_index"] = index
+        legacy_rows = [
+            {
+                # This is deliberately a shard-local index that points at an
+                # unrelated row in the full dataset.
+                "source_index": 0,
+                "session_id": single_rows[240]["session_id"],
+            }
+        ]
+
+        manifests = build_manifests(single_rows, multi_rows, legacy_rows)
+        task2_rows = [
+            row
+            for name in ("t2_cal40.json", "t2_dev80.json", "t2_test120.json")
+            for row in manifests[name]
+        ]
+        task3_rows = [
+            row
+            for name in ("t3_cal20.json", "t3_dev40.json", "t3_test60.json")
+            for row in manifests[name]
+        ]
+
+        self.assertIn(0, {row["source_index"] for row in task2_rows})
+        self.assertNotIn(
+            legacy_rows[0]["session_id"],
+            {row["session_id"] for row in task2_rows},
+        )
+        self.assertIn(0, {row["source_index"] for row in task3_rows})
 
     def test_records_assigned_source_indices_in_summary(self):
         single_rows = make_single_rows(240)

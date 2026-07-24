@@ -31,6 +31,12 @@ from agents.search_compat import (
 from agents.vega_config import ExperimentVariant, VegaThresholds
 DATASET_ID = "crag-mm-2025/crag-mm-single-turn-public"
 DATASET_REVISION = "v0.1.2"
+DEFAULT_IMAGE_MODEL = "openai/clip-vit-large-patch14-336"
+DEFAULT_TEXT_MODEL = "BAAI/bge-large-en-v1.5"
+DEFAULT_IMAGE_INDEX = "crag-mm-2025/image-search-index-validation"
+DEFAULT_WEB_INDEX = "crag-mm-2025/web-search-index-validation"
+IMAGE_INDEX_REVISION = "19b5f4dca7218b0231b59e2c3da74da73b6acad7"
+WEB_INDEX_REVISION = "ad1614b964d62575637babb7469f8c3086adb402"
 
 
 def file_sha256(path: str | Path) -> str:
@@ -140,13 +146,33 @@ def build_search_pipeline(mode: TaskMode):
     from cragmm_search.search import UnifiedSearchPipeline
 
     kwargs = {
-        "image_model_name": "openai/clip-vit-large-patch14-336",
-        "image_hf_dataset_id": "crag-mm-2025/image-search-index-validation",
+        "image_model_name": os.getenv(
+            "CRAG_IMAGE_MODEL",
+            DEFAULT_IMAGE_MODEL,
+        ),
+        "image_hf_dataset_id": os.getenv(
+            "CRAG_IMAGE_INDEX",
+            DEFAULT_IMAGE_INDEX,
+        ),
+        "image_hf_dataset_tag": os.getenv(
+            "CRAG_IMAGE_INDEX_REVISION",
+            IMAGE_INDEX_REVISION,
+        ),
     }
     if mode is TaskMode.TASK2:
         kwargs.update({
-            "text_model_name": "BAAI/bge-large-en-v1.5",
-            "web_hf_dataset_id": "crag-mm-2025/web-search-index-validation",
+            "text_model_name": os.getenv(
+                "CRAG_TEXT_MODEL",
+                DEFAULT_TEXT_MODEL,
+            ),
+            "web_hf_dataset_id": os.getenv(
+                "CRAG_WEB_INDEX",
+                DEFAULT_WEB_INDEX,
+            ),
+            "web_hf_dataset_tag": os.getenv(
+                "CRAG_WEB_INDEX_REVISION",
+                WEB_INDEX_REVISION,
+            ),
         })
     return UnifiedSearchPipeline(**kwargs)
 

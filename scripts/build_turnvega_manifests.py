@@ -125,35 +125,25 @@ def _task3_candidate(row, source_index):
 def _legacy_identifiers(rows):
     if not isinstance(rows, list):
         raise ValueError("legacy manifest must be a list of dict rows")
-    source_indices = set()
     session_ids = set()
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError("legacy manifest rows must be dict values")
-        has_source = "source_index" in row
-        has_session = "session_id" in row
-        if not has_source and not has_session:
-            raise ValueError(
-                "legacy manifest row must contain source_index or session_id"
-            )
-        if has_source:
+        if "source_index" in row:
             source_index = row["source_index"]
             if type(source_index) is not int:
                 raise ValueError("legacy source_index must be an int")
-            source_indices.add(source_index)
-        if has_session:
-            session_id = row["session_id"]
-            if not isinstance(session_id, str) or not session_id.strip():
-                raise ValueError("legacy session_id must be a non-empty string")
-            session_ids.add(session_id)
-    return source_indices, session_ids
+        session_id = row.get("session_id")
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise ValueError("legacy session_id must be a non-empty string")
+        session_ids.add(session_id)
+    return session_ids
 
 
 def _eligible_candidates(
     rows,
     converter,
     dataset_kind,
-    legacy_sources,
     legacy_sessions,
 ):
     candidates = []
@@ -183,7 +173,11 @@ def _eligible_candidates(
         seen_sessions.add(session_id)
 
         manifest_row, stratum = converter(row, source_index)
-        if source_index in legacy_sources or session_id in legacy_sessions:
+        # Source indices are local to each dataset and may also come from a
+        # single downloaded parquet shard.  Session IDs are the stable
+        # cross-file identity, so legacy exclusions must never use a bare
+        # source_index.
+        if session_id in legacy_sessions:
             continue
         identity = (
             dataset_kind,
@@ -247,19 +241,17 @@ def _build_manifest_bundle(
     legacy_manifest_rows,
     seed=DEFAULT_SEED,
 ):
-    legacy_sources, legacy_sessions = _legacy_identifiers(legacy_manifest_rows)
+    legacy_sessions = _legacy_identifiers(legacy_manifest_rows)
     task2_candidates, task2_assigned_count = _eligible_candidates(
         single_rows,
         _task2_candidate,
         "task2",
-        legacy_sources,
         legacy_sessions,
     )
     task3_candidates, task3_assigned_count = _eligible_candidates(
         multi_rows,
         _task3_candidate,
         "task3",
-        legacy_sources,
         legacy_sessions,
     )
 
@@ -370,6 +362,7 @@ def _manifest_summary(manifests, seed, metadata):
         "source_index_namespace": (
             "dataset-local; cross-task source indices are not compared"
         ),
+        "legacy_exclusion_identity": "session_id",
         **metadata,
         "derived_main40": derived,
     }
@@ -498,11 +491,15 @@ def main(argv=None):
         "parquet",
         data_files=args.single_dataset_path,
         split="train",
+        columns=["session_id", "turns"],
+        keep_in_memory=False,
     )
     multi_rows = load_dataset(
         "parquet",
         data_files=args.multi_dataset_path,
         split="train",
+        columns=["session_id", "turns"],
+        keep_in_memory=False,
     )
     with Path(args.legacy_manifest).open(encoding="utf-8") as handle:
         legacy_rows = json.load(handle)

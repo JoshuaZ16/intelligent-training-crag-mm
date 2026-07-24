@@ -6,6 +6,7 @@ submission can use vLLM while Apple Silicon development can use MLX-VLM.
 
 from __future__ import annotations
 
+import gc
 import html
 import json
 import logging
@@ -381,6 +382,7 @@ class VllmBackend:
         self.vllm = vllm
         self.seed = seed
         self.temperature = temperature
+        self._closed = False
         self.llm = vllm.LLM(
             model_name,
             seed=seed,
@@ -419,6 +421,61 @@ class VllmBackend:
 
     def count_tokens(self, text: str) -> int:
         return len(self.tokenizer.encode(text))
+
+    def close(self) -> List[str]:
+        """Best-effort, idempotent teardown for a single-process vLLM run."""
+        if self._closed:
+            return []
+        self._closed = True
+        errors: List[str] = []
+
+        llm = self.llm
+        self.llm = None
+        self.tokenizer = None
+        engine = getattr(llm, "llm_engine", None)
+        executor = getattr(engine, "model_executor", None)
+        shutdown = getattr(executor, "shutdown", None)
+        if callable(shutdown):
+            try:
+                shutdown()
+            except Exception as exc:  # pragma: no cover - runtime dependent.
+                errors.append(
+                    f"vLLM executor shutdown failed: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+
+        try:
+            from vllm.distributed.parallel_state import (
+                destroy_distributed_environment,
+                destroy_model_parallel,
+            )
+
+            for name, cleanup in (
+                ("model parallel", destroy_model_parallel),
+                ("distributed environment", destroy_distributed_environment),
+            ):
+                try:
+                    cleanup()
+                except Exception as exc:  # pragma: no cover - runtime dependent.
+                    errors.append(
+                        f"vLLM {name} cleanup failed: "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+        except ImportError:
+            pass
+
+        del executor, engine, llm
+        gc.collect()
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception as exc:  # pragma: no cover - runtime dependent.
+            errors.append(
+                f"CUDA cache cleanup failed: {type(exc).__name__}: {exc}"
+            )
+        return errors
 
 
 class MlxVlmBackend:
@@ -490,6 +547,40 @@ class CourseRAGAgentV2(BaseAgent):
         self.config = config or AgentConfig.from_env()
         self.backend = backend if backend is not None else (create_backend() if load_backend else None)
         self.trace_identity_provider = trace_identity_provider
+        self._closed = False
+
+    def close(self) -> List[str]:
+        """Release generation and retrieval resources exactly once."""
+        if self._closed:
+            return []
+        self._closed = True
+        errors: List[str] = []
+
+        backend_close = getattr(self.backend, "close", None)
+        if callable(backend_close):
+            try:
+                backend_errors = backend_close()
+                if backend_errors:
+                    errors.extend(str(error) for error in backend_errors)
+            except Exception as exc:  # pragma: no cover - defensive cleanup.
+                errors.append(
+                    f"backend cleanup failed: {type(exc).__name__}: {exc}"
+                )
+
+        try:
+            from agents.search_compat import close_search_pipeline
+
+            errors.extend(close_search_pipeline(self.search_pipeline))
+        except Exception as exc:  # pragma: no cover - defensive cleanup.
+            errors.append(
+                f"search cleanup failed: {type(exc).__name__}: {exc}"
+            )
+
+        self.backend = None
+        self.search_pipeline = None
+        self.trace_identity_provider = None
+        gc.collect()
+        return errors
 
     def get_batch_size(self) -> int:
         return self.config.batch_size

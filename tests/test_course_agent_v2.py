@@ -313,11 +313,25 @@ class CourseAgentCoreTest(unittest.TestCase):
     def test_vllm_backend_receives_seed_and_zero_temperature(self):
         fake_vllm = types.ModuleType("vllm")
 
+        class FakeExecutor:
+            def __init__(self):
+                self.shutdown_count = 0
+
+            def shutdown(self):
+                self.shutdown_count += 1
+
         class FakeLlm:
+            def __init__(self):
+                self.executor = FakeExecutor()
+                self.llm_engine = types.SimpleNamespace(
+                    model_executor=self.executor
+                )
+
             def get_tokenizer(self):
                 return object()
 
-        fake_vllm.LLM = mock.Mock(return_value=FakeLlm())
+        fake_llm = FakeLlm()
+        fake_vllm.LLM = mock.Mock(return_value=fake_llm)
         with mock.patch.dict(sys.modules, {"vllm": fake_vllm}):
             backend = VllmBackend(
                 "org/model",
@@ -327,6 +341,9 @@ class CourseAgentCoreTest(unittest.TestCase):
         self.assertEqual(backend.seed, 1234)
         self.assertEqual(backend.temperature, 0.0)
         self.assertEqual(fake_vllm.LLM.call_args.kwargs["seed"], 1234)
+        self.assertEqual(backend.close(), [])
+        self.assertEqual(backend.close(), [])
+        self.assertEqual(fake_llm.executor.shutdown_count, 1)
 
 
 if __name__ == "__main__":

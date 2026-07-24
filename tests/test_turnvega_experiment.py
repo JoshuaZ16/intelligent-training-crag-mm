@@ -652,6 +652,9 @@ class TurnVegaRunLifecycleTest(unittest.TestCase):
             self.assertEqual(run["error_type"], "RuntimeError")
             self.assertIn("planned evaluator failure", run["error_message"])
             self.assertTrue(run["completed_at_utc"])
+            self.assertTrue(run["cleanup_started_at_utc"])
+            self.assertTrue(run["cleanup_completed_at_utc"])
+            self.assertEqual(run["cleanup_errors"], [])
 
     def test_unsupported_variant_is_not_reported_completed(self):
         with tempfile.TemporaryDirectory() as tmp:
